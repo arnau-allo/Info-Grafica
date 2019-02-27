@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <vector>
 #include <GL\glew.h>
 #include <glm\gtc\type_ptr.hpp>
 #include <glm\gtc\matrix_transform.hpp>
@@ -8,6 +11,7 @@
 #include <imgui\imgui_impl_sdl_gl3.h>
 
 #include "GL_framework.h"
+#include "load_obj.cpp"
 
 ///////// fw decl
 namespace ImGui {
@@ -19,6 +23,11 @@ void cleanupAxis();
 void drawAxis();
 }
 ////////////////
+
+//variables to load an object:
+std::vector< glm::vec3 > vertices;
+std::vector< glm::vec2 > uvs;
+std::vector< glm::vec3 > normals;
 
 namespace RenderVars {
 	const float FOV = glm::radians(65.f);
@@ -445,6 +454,8 @@ GLuint myVao; //vertex array
 
 void GLinit(int width, int height) {
 
+	bool res = loadOBJ("cube.obj", vertices, uvs, normals);
+
 	glViewport(0, 0, width, height);
 
 	glClearColor(0.2f, 0.2f, 0.2f, 1.f);
@@ -606,3 +617,11 @@ void GUI() {
 		ImGui::ShowTestWindow(&show_test_window);
 	}
 }
+
+extern bool loadOBJ(const char * path,
+	std::vector < glm::vec3 > &
+	out_vertices,
+	std::vector < glm::vec2 > & out_uvs,
+	std::vector < glm::vec3 > & out_normals
+);
+
