@@ -86,6 +86,6 @@ bool loadOBJ(
 				out_normals.push_back(normal);
 			}
 		}
-		return true;
 	}
+	return true;
 }

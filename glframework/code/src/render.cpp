@@ -574,7 +574,7 @@ void GLinit(int width, int height) {
 
 	Axis::setupAxis();
 
-	Cube::setupCube();
+	//Cube::setupCube();
 
 	Object::setupObject();
 
