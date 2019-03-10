@@ -369,27 +369,32 @@ namespace Object{
 
 	glm::mat4 objMat = glm::mat4(1.f);
 	glm::vec4 objColor = { 0.1f, 1.f, 1.f, 0.f };
-
-	const char* cube_vertShader =
-		"#version 330\n\
-in vec3 in_Position;\n\
-in vec3 in_Normal;\n\
+	/*in vec3 in_Normal;\n\
 out vec4 vert_Normal;\n\
 uniform mat4 objMat;\n\
 uniform mat4 mv_Mat;\n\
+
+vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\*/
+	const char* cube_vertShader =
+		"#version 330\n\
+in vec3 in_Position;\n\
 uniform mat4 mvpMat;\n\
 void main() {\n\
 	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
-	vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
 }";
+	/*
+	in vec4 vert_Normal;\n\
+	uniform mat4 mv_Mat;\n\
+	out_Color = vec4(color.xyz * dot(vert_Normal, mv_Mat*vec4(0.0, 1.0, 0.0, 0.0)) + color.xyz * 0.3, 1.0 );\n\
+	*/
 	const char* cube_fragShader =
 		"#version 330\n\
-in vec4 vert_Normal;\n\
 out vec4 out_Color;\n\
-uniform mat4 mv_Mat;\n\
 uniform vec4 color;\n\
+uniform vec4 ambient;\n\
 void main() {\n\
-	out_Color = vec4(color.xyz * dot(vert_Normal, mv_Mat*vec4(0.0, 1.0, 0.0, 0.0)) + color.xyz * 0.3, 1.0 );\n\
+	vec3 rgb= min(color.rgb*ambient.rgb, vec3(1.0)); \n\
+	out_Color = color; \n\
 }";
 
 void setupObject() {
@@ -446,7 +451,9 @@ void drawObject() {
 	glUniformMatrix4fv(glGetUniformLocation(objectProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 	glUniformMatrix4fv(glGetUniformLocation(objectProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 	glUniformMatrix4fv(glGetUniformLocation(objectProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-	glUniform4f(glGetUniformLocation(objectProgram, "color"), objColor[0], objColor[1], objColor[2], objColor[3]);
+	glUniform4f(glGetUniformLocation(objectProgram, "color"), 0.1f, 0.5f + 0.5f*sin(currentTime), 1.f, 0.f);
+	glUniform4f(glGetUniformLocation(objectProgram, "ambient"), 0.4f + 0.2f*sin(currentTime), 0.4f + 0.2f*sin(currentTime), 0.4f + 0.2f*sin(currentTime), 0.0f);
+	//glUniform4f(glGetUniformLocation(objectProgram, "color"), objColor[0], objColor[1], objColor[2], objColor[3]);
 	glDrawArrays(GL_TRIANGLES, 0, Object::vertices.size());
 
 	glUseProgram(0);
