@@ -369,32 +369,26 @@ namespace Object{
 
 	glm::mat4 objMat = glm::mat4(1.f);
 	glm::vec4 objColor = { 0.1f, 1.f, 1.f, 0.f };
-	/*in vec3 in_Normal;\n\
-out vec4 vert_Normal;\n\
-uniform mat4 objMat;\n\
-uniform mat4 mv_Mat;\n\
-
-vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\*/
 	const char* cube_vertShader =
 		"#version 330\n\
 in vec3 in_Position;\n\
+in vec3 in_Normal;\n\
+out vec4 vert_Normal;\n\
+uniform mat4 objMat;\n\
+uniform mat4 mv_Mat;\n\
 uniform mat4 mvpMat;\n\
 void main() {\n\
 	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
+	vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
 }";
-	/*
-	in vec4 vert_Normal;\n\
-	uniform mat4 mv_Mat;\n\
-	out_Color = vec4(color.xyz * dot(vert_Normal, mv_Mat*vec4(0.0, 1.0, 0.0, 0.0)) + color.xyz * 0.3, 1.0 );\n\
-	*/
 	const char* cube_fragShader =
 		"#version 330\n\
+in vec4 vert_Normal;\n\
 out vec4 out_Color;\n\
+uniform mat4 mv_Mat;\n\
 uniform vec4 color;\n\
-uniform vec4 ambient;\n\
 void main() {\n\
-	vec3 rgb= min(color.rgb*ambient.rgb, vec3(1.0)); \n\
-	out_Color = color; \n\
+	out_Color = vec4(color.xyz * dot(vert_Normal, mv_Mat*vec4(0.0, 1.0, 0.0, 0.0)) + color.xyz * 0.3, 1.0 );\n\
 }";
 
 void setupObject() {
@@ -443,7 +437,7 @@ void cleanupObject() {
 
 }
 */
-void drawObject() {
+void drawObject(float currentTime) {
 
 	glBindVertexArray(objectVao);
 	glUseProgram(objectProgram);
@@ -673,7 +667,7 @@ void GLrender(float dt) {
 
 	/////////////////////////////////////////////////////////
 
-	Object::drawObject();
+	Object::drawObject(currentTime);
 	/*
 	currentTime += dt;
 	const GLfloat color[] = { (float)sin ( currentTime ) * 0.5f + 0.5f, (float)cos ( currentTime )* 0.5f + 0.5f, 0.0f, 1.0f };
@@ -699,7 +693,17 @@ void GLrender(float dt) {
 
 }
 
-void GUI() {
+void DollyEffect(int width, int height)
+{
+	float newFov = RV::FOV;
+	while (newFov < 100)
+	{
+		newFov += 1;
+		RV::_projection = glm::perspective(newFov, (float)width / (float)height, RV::zNear, RV::zFar);
+	}
+}
+
+void GUI(int width, int height) {
 	bool show = true;
 	ImGui::Begin("Physics Parameters", &show, 0);
 
@@ -712,6 +716,7 @@ void GUI() {
 		// ...
 		// ...
 		/////////////////////////////////////////////////////////
+		if (ImGui::Button("Click"))		{			DollyEffect(width, height);		}
 	}
 	// .........................
 

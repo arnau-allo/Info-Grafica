@@ -8,7 +8,7 @@
 #include "GL_framework.h"
 
 
-extern void GUI();
+extern void GUI(int width, int height);
 extern void GLmousecb(MouseEvent ev);
 extern void GLResize(int width, int height);
 extern void GLinit(int width, int height);
@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
 		ImGui_ImplSdlGL3_NewFrame(mainwindow);
 
 		ImGuiIO& io = ImGui::GetIO();
-		GUI();
+		GUI(display_w, display_h);
 		if(!io.WantCaptureMouse) {
 			MouseEvent ev = {io.MousePos.x, io.MousePos.y, 
 				(io.MouseDown[0] ? MouseEvent::Button::Left : 
