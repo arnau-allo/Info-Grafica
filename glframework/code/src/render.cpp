@@ -217,6 +217,8 @@ GLuint cubeShaders[2];
 GLuint cubeProgram;
 glm::mat4 objMat = glm::mat4(1.f);
 glm::vec4 objColor = { 0.1f, 1.f, 1.f, 0.f };
+glm::vec4 lightPosition = { 10.f, 10.f, 10.f, 0.f };
+glm::vec4 lightColor = { 1.f, 1.f, 1.f, 0.f };
 
 extern const float halfW = 0.5f;
 int numVerts = 24 + 6; // 4 vertex/face * 6 faces + 6 PRIMITIVE RESTART
@@ -278,21 +280,50 @@ const char* cube_vertShader =
 in vec3 in_Position;\n\
 in vec3 in_Normal;\n\
 out vec4 vert_Normal;\n\
+out vec4 fragPos;\n\
 uniform mat4 objMat;\n\
 uniform mat4 mv_Mat;\n\
 uniform mat4 mvpMat;\n\
 void main() {\n\
 	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
+	fragPos = objMat * vec4(in_Position, 1.0);\n\
 	vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
 }";
 const char* cube_fragShader =
 "#version 330\n\
 in vec4 vert_Normal;\n\
+in vec4 fragPos;\n\
 out vec4 out_Color;\n\
 uniform mat4 mv_Mat;\n\
 uniform vec4 color;\n\
+vec4 LightPosition;\n\
+vec4 LightDirection;\n\
+uniform vec4 LightColor;\n\
+uniform vec4 cameraPoint;\n\
+vec4 cameraDirection;\n\
+float Kd;\n\
+float Ks;\n\
+float Ka;\n\
+float Ld;\n\
+float Ls;\n\
+float La;\n\
+float FinalL;\n\
+float shininess;\n\
+vec4 mirrorLightDirection;\n\
 void main() {\n\
-	out_Color = vec4(color.xyz * dot(vert_Normal, mv_Mat*vec4(0.0, 1.0, 0.0, 0.0)) + color.xyz * 0.3, 1.0 );\n\
+	cameraDirection = cameraPoint - fragPos;\n\
+	Kd = .2f;\n\
+	Ks = 1.f;\n\
+	Ka = 1.f;\n\
+	shininess = 1.f;\n\
+	LightPosition = vec4(1.f, 1.f, 1.f, 0.f );\n\
+	LightDirection = normalize(LightPosition - fragPos);\n\
+	mirrorLightDirection = 2*(LightDirection*vert_Normal)*vert_Normal - LightDirection;\n\
+	Ld = Kd*clamp(dot(vert_Normal,mv_Mat*LightDirection),0,1);\n\
+	Ls = Ks*pow(dot(cameraDirection,mirrorLightDirection), shininess);\n\
+	La = Ka;\n\
+	FinalL = Ld + Ls + La;\n\
+	out_Color = vec4(color.xyz * FinalL, 0.0f);\n\
 }";
 void setupCube() {
 	glGenVertexArrays(1, &cubeVao);
@@ -347,6 +378,9 @@ void drawCube() {
 	glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 	glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 	glUniform4f(glGetUniformLocation(cubeProgram, "color"),  objColor[0], objColor[1], objColor[2], objColor[3] );
+	//glUniform4f(glGetUniformLocation(cubeProgram, "LightPosition"), lightPosition[0], lightPosition[1], lightPosition[2], lightPosition[3]);
+	glUniform4f(glGetUniformLocation(cubeProgram, "LightColor"), lightColor[0], lightColor[1], lightColor[2], lightColor[3]);
+	glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "cameraPoint"), 1, GL_FALSE, glm::value_ptr(RenderVars::_cameraPoint));
 	glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
 
 	glUseProgram(0);
@@ -575,9 +609,9 @@ void GLinit(int width, int height) {
 
 	Axis::setupAxis();
 
-	//Cube::setupCube();
+	Cube::setupCube();
 
-	Object::setupObject();
+	//Object::setupObject();
 
 
 	/////////////////////////////////////////////////////TODO
@@ -658,8 +692,8 @@ void GLrender(float dt) {
 	Cube::objMat = glm::translate(Cube::objMat, glm::vec3(2.f, 3*sin(currentTime), 0.f));
 	Cube::objMat = glm::rotate(Cube::objMat, currentTime, glm::vec3(0.f, 1.f, 0.f));					//Rotació (Planeta)
 	Cube::objMat = glm::scale(Cube::objMat, glm::vec3(1 + std::abs(sin(currentTime)), 1 + std::abs(sin(currentTime)), 1 + std::abs(sin(currentTime))));
-	
-	Cube::drawCube();*/
+	*/
+	Cube::drawCube();
 
 	// ...
 
@@ -667,7 +701,7 @@ void GLrender(float dt) {
 
 	/////////////////////////////////////////////////////////
 
-	Object::drawObject(currentTime);
+	//Object::drawObject(currentTime);
 	/*
 	currentTime += dt;
 	const GLfloat color[] = { (float)sin ( currentTime ) * 0.5f + 0.5f, (float)cos ( currentTime )* 0.5f + 0.5f, 0.0f, 1.0f };
