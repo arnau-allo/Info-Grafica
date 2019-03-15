@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
 		ImGui_ImplSdlGL3_NewFrame(mainwindow);
 
 		ImGuiIO& io = ImGui::GetIO();
-		GUI(display_w, display_h);
+		GUI();
 		if(!io.WantCaptureMouse) {
 			MouseEvent ev = {io.MousePos.x, io.MousePos.y, 
 				(io.MouseDown[0] ? MouseEvent::Button::Left : 
