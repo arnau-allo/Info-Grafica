@@ -8,7 +8,7 @@
 #include "GL_framework.h"
 
 
-extern void GUI(int width, int height);
+extern void GUI();
 extern void GLmousecb(MouseEvent ev);
 extern void GLResize(int width, int height);
 extern void GLinit(int width, int height);
@@ -51,8 +51,8 @@ int main(int argc, char** argv) {
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1); 
-	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24); //Bits de profundidad en el buffer
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
 	mainwindow = SDL_CreateWindow("GL_framework", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 		800, 600, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
