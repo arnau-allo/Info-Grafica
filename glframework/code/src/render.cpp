@@ -302,6 +302,7 @@ namespace TOct {
 	GLuint tOctVbo[3];
 	GLuint tOctShaders[2];
 	GLuint tOctProgram;
+	GLuint geom_shader;
 	glm::mat4 objMat = glm::mat4(1.f);
 
 	extern const float a = 1.f;
@@ -310,7 +311,7 @@ namespace TOct {
 	int numVerts = 1; // 4 vertex/face * 22 faces + 22 PRIMITIVE RESTART
 
 	glm::vec3 verts[] = {
-		glm::vec3(1, 1, 1)
+		glm::vec3(0.0, 2.0, 0.0)
 	};
 
 	glm::vec3 norms[] = {
@@ -362,208 +363,268 @@ namespace TOct {
 
 	const char* tOct_vertShader =
 		"#version 330\n\
-in vec3 in_Position; \n\
-in vec3 in_Normal; \n\
-vec4 vert_Normal; \n\
-uniform mat4 objMat; \n\
-uniform mat4 mv_Mat; \n\
-uniform mat4 mvpMat; \n\
+in vec3 in_Position;\n\
+in vec3 in_Normal;\n\
+out vec4 vert_Normal;\n\
+uniform mat4 objMat;\n\
+uniform mat4 mv_Mat;\n\
+uniform mat4 mvpMat;\n\
 void main() {\n\
-	gl_Position = vec4(in_Position, 1.0); \n\
-	vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0); \n\
+	gl_Position = vec4(in_Position, 1.0);\n\
+	vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
+}";
+	const char* tOct_fragShader =
+		"#version 330\n\
+in vec4 vert_Normal;\n\
+out vec4 out_Color;\n\
+uniform mat4 mv_Mat; \n\
+uniform vec4 color;\n\
+void main() {\n\
+	out_Color = vec4(color.xyz, 1.0);\n\
 }";
 
-	const char* tOct_geomShader =
+	const char* tOct_geomShader[] =
+	{ 
 		"#version 330\n\
 layout(points) in;\n\
-layout(triangle_strip, max_vertices = 50) out;\n\
-uniform mat4 mvpMat; \n\
+layout(triangle_strip, max_vertices = 100) out; \n\
+uniform mat4 mvpMat;\n\
 uniform float c;\n\
 uniform float h;\n\
 void main() {\n\
-	vec4 offset1 = vec4(c, 0, h-c);\n\
-	vec4 offset2 = vec4(-c, 0, h-c);\n\
-	vec4 offset3 = vec4(0, c, h-c);\n\
-	vec4 offset4 = vec4(0, -c, h-c);\n\
-	vec4 offset5 = vec4(c, h - c, 0);\n\
-	vec4 offset6 = vec4(-c, h - c, 0);\n\
-	vec4 offset7 = vec4(0, h - c, c);\n\
-	vec4 offset8 = vec4(0, h - c, -c);\n\
-	vec4 offset9 = vec4(h -c, c, 0);\n\
-	vec4 offset10 = vec4(h - c, -c, 0);\n\
-	vec4 offset11 = vec4(h - c, 0, c);\n\
-	vec4 offset12 = vec4(h - c, 0, -c);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset6);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset2);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset1);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset5);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
+	vec4 offset = vec4(c, 0, h-c, 0.0);\n\
+	vec4 offset1 = vec4(-c, 0, h-c, 0.0);\n\
+	vec4 offset2 = vec4(0, c, h-c, 0.0);\n\
+	vec4 offset3 = vec4(0, -c, h-c,0.0);\n\
+	vec4 offset4 = vec4(c, 0, -(h-c), 0.0);\n\
+	vec4 offset5 =  vec4(-c, 0, -(h-c), 0.0);\n\
+	vec4 offset6 = vec4(0, c, -(h-c), 0.0);\n\
+	vec4 offset7 = vec4(0, -c, -(h-c),0.0);\n\
+	vec4 offset8 = vec4(c, h - c, 0, 0.0);\n\
+	vec4 offset9 = vec4(-c, h - c, 0, 0.0);\n\
+	vec4 offset10 = vec4(0, h - c, c, 0.0);\n\
+	vec4 offset11 = vec4(0, h - c, -c, 0.0);\n\
+	vec4 offset12 = vec4(c, -(h-c), 0, 0.0);\n\
+	vec4 offset13 = vec4(-c, -(h-c), 0, 0.0);\n\
+	vec4 offset14 = vec4(0, -(h-c), c, 0.0);\n\
+	vec4 offset15 = vec4(0, -(h-c), -c, 0.0);\n\
+	vec4 offset16 = vec4(h -c, c, 0, 0.0);\n\
+	vec4 offset17 = vec4(h - c, -c, 0, 0.0);\n\
+	vec4 offset18 = vec4(h - c, 0, c, 0.0);\n\
+	vec4 offset19 = vec4(h - c, 0, -c, 0.0);\n\
+	vec4 offset20 = vec4(-(h-c), c, 0, 0.0);\n\
+	vec4 offset21 = vec4(-(h-c), -c, 0, 0.0);\n\
+	vec4 offset22 = vec4(-(h-c), 0, c, 0.0);\n\
+	vec4 offset23 = vec4(-(h-c), 0, -c, 0.0);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
 	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset3);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset9);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset10);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset4);\n\
-	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
 	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
 	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset12);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset8);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset7);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset11);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
-	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
 	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset1);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset5);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset11);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset9);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset7);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset3);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset12);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset10);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset7);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
 	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset3);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset15);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
 	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
 	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset2);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
 	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset6);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
 	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset10);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset1);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset4);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset11);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset6);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
 	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset8);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
 	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset4);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
 	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
 	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
 	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset2);\n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset15); \n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7); \n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset12); \n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17); \n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset8);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
 	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
 	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset12);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
 	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset9);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position - offset5);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
-}";
-	
-	const char* tOct_fragShader =
-		"#version 330\n\
-out vec4 out_Color;\n\
-void main() {\n\
-	out_Color = vec4(0.2, 0.8, 0.5, 1);\n\
-}";
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset15);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+}"/*"#version 330\n\
+layout(points) in;\n\
+layout(triangle_strip, max_vertices = 100) out;\n\
+uniform mat4 mvpMat; \n\
+
+}" */};
 
 	void setupTOct() {
 		glGenVertexArrays(1, &tOctVao);
 		glBindVertexArray(tOctVao);
-		glGenBuffers(3, tOctVbo);
+		glGenBuffers(2, tOctVbo);
 
 		glBindBuffer(GL_ARRAY_BUFFER, tOctVbo[0]);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(tOctVerts), tOctVerts, GL_STATIC_DRAW);
@@ -575,9 +636,8 @@ void main() {\n\
 		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(1);
 
-		glPrimitiveRestartIndex(UCHAR_MAX);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tOctVbo[2]);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(tOctIdx), tOctIdx, GL_STATIC_DRAW);
+		geom_shader = glCreateShader(GL_GEOMETRY_SHADER);
+		glShaderSource(geom_shader, 1, tOct_geomShader, NULL);
 
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -589,6 +649,7 @@ void main() {\n\
 		tOctProgram = glCreateProgram();
 		glAttachShader(tOctProgram, tOctShaders[0]);
 		glAttachShader(tOctProgram, tOctShaders[1]);
+		glAttachShader(tOctProgram, geom_shader);
 		glBindAttribLocation(tOctProgram, 0, "in_Position");
 		glBindAttribLocation(tOctProgram, 1, "in_Normal");
 		linkProgram(tOctProgram);
@@ -600,12 +661,12 @@ void main() {\n\
 		glDeleteProgram(tOctProgram);
 		glDeleteShader(tOctShaders[0]);
 		glDeleteShader(tOctShaders[1]);
+		glDeleteShader(geom_shader);
 	}
 	void updateTOct(const glm::mat4& transform) {
 		objMat = transform;
 	}
 	void drawTOct() {
-		glEnable(GL_PRIMITIVE_RESTART);
 		glBindVertexArray(tOctVao);
 		glUseProgram(tOctProgram);
 		glUniformMatrix4fv(glGetUniformLocation(tOctProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
@@ -618,7 +679,6 @@ void main() {\n\
 
 		glUseProgram(0);
 		glBindVertexArray(0);
-		glDisable(GL_PRIMITIVE_RESTART);
 	}
 }
 
