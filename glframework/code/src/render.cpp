@@ -2,7 +2,9 @@
 #include <glm\gtc\type_ptr.hpp>
 #include <glm\gtc\matrix_transform.hpp>
 #include <cstdio>
+#include <iostream>
 #include <cassert>
+#include <time.h>
 
 #include <imgui\imgui.h>
 #include <imgui\imgui_impl_sdl_gl3.h>
@@ -305,25 +307,18 @@ namespace TOct {
 	GLuint geom_shader;
 	glm::mat4 objMat = glm::mat4(1.f);
 
-	extern const float a = 1.f;
+	extern const float a = 0.1f;
 	const float h = 3 * a * sqrt(2) / 2;
 	const float c = sqrt(pow(a, 2.0f) / 2);
-	int numVerts = 1; // 4 vertex/face * 22 faces + 22 PRIMITIVE RESTART
+	int numVerts = 20; // 4 vertex/face * 22 faces + 22 PRIMITIVE RESTART
+	float velocity = 0.5f;
 
-	glm::vec3 verts[] = {
-		glm::vec3(0.0, 2.0, 0.0)
-	};
+	glm::vec3 tOctdirections[20];
 
-	glm::vec3 norms[] = {
-		glm::vec3(0.f, 0.f, 1.f)
-	};
-
-	glm::vec3 tOctVerts[] = {
-		verts[0]
-	};
+	glm::vec3 tOctVerts[20];
 
 	glm::vec3 tOctNorms[] = {
-		norms[0]
+		glm::vec3(0.f, 0.f, 1.f)
 	};
 	GLubyte tOctIdx[] = {
 		0
@@ -376,21 +371,22 @@ void main() {\n\
 	const char* tOct_fragShader =
 		"#version 330\n\
 in vec4 vert_Normal;\n\
-out vec4 out_Color;\n\
+in vec4 colorFaces;\n\
 uniform mat4 mv_Mat; \n\
-uniform vec4 color;\n\
+out vec4 out_Color;\n\
 void main() {\n\
-	out_Color = vec4(color.xyz, 1.0);\n\
+	out_Color = colorFaces;\n\
 }";
 
 	const char* tOct_geomShader[] =
-	{ 
+	{
 		"#version 330\n\
 layout(points) in;\n\
 layout(triangle_strip, max_vertices = 100) out; \n\
 uniform mat4 mvpMat;\n\
 uniform float c;\n\
 uniform float h;\n\
+out vec4 colorFaces;\n\
 void main() {\n\
 	vec4 offset = vec4(c, 0, h-c, 0.0);\n\
 	vec4 offset1 = vec4(-c, 0, h-c, 0.0);\n\
@@ -416,6 +412,7 @@ void main() {\n\
 	vec4 offset21 = vec4(-(h-c), -c, 0, 0.0);\n\
 	vec4 offset22 = vec4(-(h-c), 0, c, 0.0);\n\
 	vec4 offset23 = vec4(-(h-c), 0, -c, 0.0);\n\
+	colorFaces = vec4(0.8f, 0.1f, 0.5f, 1.0f);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
@@ -470,6 +467,7 @@ void main() {\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
+	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
@@ -479,6 +477,7 @@ void main() {\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
+	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
@@ -488,6 +487,7 @@ void main() {\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
+	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
@@ -497,6 +497,7 @@ void main() {\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
+	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
@@ -506,6 +507,7 @@ void main() {\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
+	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
@@ -515,6 +517,7 @@ void main() {\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
+	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
@@ -524,6 +527,7 @@ void main() {\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
+	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
@@ -533,6 +537,7 @@ void main() {\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
+	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
@@ -542,6 +547,7 @@ void main() {\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
+	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
@@ -551,6 +557,7 @@ void main() {\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
+	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
@@ -560,6 +567,7 @@ void main() {\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
+	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
@@ -569,6 +577,7 @@ void main() {\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
+	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset15); \n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7); \n\
@@ -578,6 +587,7 @@ void main() {\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17); \n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
+	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
@@ -587,6 +597,7 @@ void main() {\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
+	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
@@ -596,6 +607,7 @@ void main() {\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
+	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
@@ -605,6 +617,7 @@ void main() {\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
+	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
 	EmitVertex(); \n\
 	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
@@ -615,13 +628,19 @@ void main() {\n\
 	EmitVertex(); \n\
 	EndPrimitive(); \n\
 }"/*"#version 330\n\
-layout(points) in;\n\
-layout(triangle_strip, max_vertices = 100) out;\n\
-uniform mat4 mvpMat; \n\
+  layout(points) in;\n\
+  layout(triangle_strip, max_vertices = 100) out;\n\
+  uniform mat4 mvpMat; \n\
 
-}" */};
+  }" */ };
 
 	void setupTOct() {
+		for (int i = 0; i < 20; i++)
+			tOctVerts[i] = glm::vec3((rand() % 100) / 10.f - 5, rand() % 100 / 10.f, (rand() % 100) / 10.f - 5);
+
+		for (int i = 0; i < 20; i++)
+			tOctdirections[i] = glm::vec3((rand() % 100) / 10.f - 5, rand() % 100 / 10.f, (rand() % 100) / 10.f - 5);
+
 		glGenVertexArrays(1, &tOctVao);
 		glBindVertexArray(tOctVao);
 		glGenBuffers(2, tOctVbo);
@@ -663,19 +682,668 @@ uniform mat4 mvpMat; \n\
 		glDeleteShader(tOctShaders[1]);
 		glDeleteShader(geom_shader);
 	}
-	void updateTOct(const glm::mat4& transform) {
-		objMat = transform;
+	void updateTOct() {
+		for (int i = 0; i < 20; i++)
+		{
+			if (tOctVerts[i].x < -5 || tOctVerts[i].x > 5) {
+				tOctdirections[i] = glm::vec3(-tOctdirections[i].x, rand() % 10, (rand() % 10) - 5);
+				if (tOctVerts[i].x > 5) tOctVerts[i].x = 5;
+				else tOctVerts[i].x = -5;
+			}
+			else if (tOctVerts[i].y < 0 || tOctVerts[i].y > 10) {
+				tOctdirections[i] = glm::vec3((rand() % 10) - 5, -tOctdirections[i].y, (rand() % 10) - 5);
+				if (tOctVerts[i].y > 10) tOctVerts[i].y = 10;
+				else tOctVerts[i].y = 0;
+			}
+			else if (tOctVerts[i].z < -5 || tOctVerts[i].z > 5) {
+				tOctdirections[i] = glm::vec3((rand() % 10) - 5, rand() % 10, -tOctdirections[i].z);
+				if (tOctVerts[i].z > 5) tOctVerts[i].z = 5;
+				else tOctVerts[i].z = -5;
+			}
+
+			tOctVerts[i] += glm::vec3(tOctdirections[i].x * (velocity / 100.f), tOctdirections[i].y * (velocity / 100.f), tOctdirections[i].z * (velocity / 100.f));
+		}
 	}
-	void drawTOct() {
+	void drawTOct(float dt) {
 		glBindVertexArray(tOctVao);
 		glUseProgram(tOctProgram);
 		glUniformMatrix4fv(glGetUniformLocation(tOctProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(tOctProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(tOctProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		glUniform4f(glGetUniformLocation(tOctProgram, "color"), 0.5f, 0.8f, 0.1f, 1.0f);
 		glUniform1f(glGetUniformLocation(tOctProgram, "c"), c);
 		glUniform1f(glGetUniformLocation(tOctProgram, "h"), h);
 		glDrawArrays(GL_POINTS, 0, numVerts);
+
+		updateTOct();
+		glBindBuffer(GL_ARRAY_BUFFER, tOctVbo[0]);
+		float *buff = (float*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+		int j = 0;
+		for (int i = 0; i < 60; i += 3) {
+			buff[i] = tOctVerts[j].x;
+			buff[i + 1] = tOctVerts[j].y;
+			buff[i + 2] = tOctVerts[j].z;
+			j++;
+		}
+		glUnmapBuffer(GL_ARRAY_BUFFER);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		glUseProgram(0);
+		glBindVertexArray(0);
+	}
+}
+
+float currentTime = 0;
+
+namespace TOct2 {
+	GLuint tOct2Vao;
+	GLuint tOct2Vbo[3];
+	GLuint tOct2Shaders[2];
+	GLuint tOct2Program;
+	GLuint geom_shader2;
+	glm::mat4 objMat2 = glm::mat4(1.f);
+
+	extern const float a = 0.3f;
+	const float h = 3 * a * sqrt(2) / 2;
+	float c = sqrt(pow(a, 2.0f) / 2); //a * 1.065f;
+	int numVerts = 25; // 4 vertex/face * 22 faces + 22 PRIMITIVE RESTART
+	float velocity = 0.5f;
+	float aa = 0;
+
+	glm::vec3 tOct2directions[20];
+
+	//glm::vec3 tOct2Verts[20];
+
+	glm::vec3 tOct2Verts[]
+	{
+		glm::vec3(-(4 * a), 5 + (4 * a), -a),
+		glm::vec3(-(2 * a), 5 + (4 * a), a),
+		glm::vec3(0 , 5 + (4 * a), -a),
+		glm::vec3(2 * a, 5 + (4 * a), a),
+		glm::vec3(4 * a, 5 + (4 * a), -a),
+		glm::vec3(-(4 * a), 5 + (2 * a), a),
+		glm::vec3(-(2 * a), 5 + (2 * a), -a),
+		glm::vec3(0, 5 + (2 * a), a),
+		glm::vec3(2 * a, 5 + (2 * a), -a),
+		glm::vec3(4 * a, 5 + (2 * a), a),
+		glm::vec3(-(4 * a), 5, -a),
+		glm::vec3(-(2 * a), 5, a),
+		glm::vec3(0, 5, -a),
+		glm::vec3(2 * a, 5, a),
+		glm::vec3(4 * a, 5, -a),
+		glm::vec3(-(4 * a), 5 - (2 * a), a),
+		glm::vec3(-(2 * a), 5 - (2 * a), -a),
+		glm::vec3(0, 5 - (2 * a), a),
+		glm::vec3(2 * a, 5 - (2 * a), -a),
+		glm::vec3(4 * a, 5 - (2 * a), a),
+		glm::vec3(-(4 * a), 5 - (4 * a), -a),
+		glm::vec3(-(2 * a), 5 - (4 * a), a),
+		glm::vec3(0, 5 - (4 * a), -a),
+		glm::vec3(2 * a, 5 - (4 * a), a),
+		glm::vec3(4 * a, 5 - (4 * a), -a)
+	};
+
+	glm::vec3 tOct2Norms[] = {
+		glm::vec3(0.f, 0.f, 1.f)
+	};
+	GLubyte tOct2Idx[] = {
+		0
+	};
+
+	//glm::vec3 verts[] = {
+	//	glm::vec3(0, 1, 1),
+	//	glm::vec3(0, -1, 1),
+	//	glm::vec3(1, 0, 1),
+	//	glm::vec3(-1, 0, 1),
+	//	/*glm::vec3(h, 0, 0),
+	//	glm::vec3(-h, 0, 0),
+	//	glm::vec3(0, h, 0),
+	//	glm::vec3(0, -h, 0),
+	//	glm::vec3(0, 0, -h)*/
+	//};
+
+	//glm::vec3 norms[] = {
+	//	glm::vec3(0, 0, h),
+	//	/*glm::vec3(h, h, h),
+	//	glm::vec3(h, -h, h),
+	//	glm::vec3(-h, h, h),
+	//	glm::vec3(-h, -h, h),
+	//	glm::vec3(h, h, -h),
+	//	glm::vec3(h, -h, -h),
+	//	glm::vec3(-h, h, -h),
+	//	glm::vec3(-h, -h, -h)*/
+	//};
+
+	//glm::vec3 tOctVerts[] = {
+	//	verts[0], verts[1], verts[3], verts[4]
+	//};
+
+	//glm::vec3 tOctNorms[] = {
+	//	norms[0], norms[0], norms[0], norms[0]
+	//};
+
+	const char* tOct2_vertShader =
+		"#version 330\n\
+in vec3 in_Position;\n\
+in vec3 in_Normal;\n\
+out vec4 vert_Normal;\n\
+uniform mat4 objMat;\n\
+uniform mat4 mv_Mat;\n\
+uniform mat4 mvpMat;\n\
+void main() {\n\
+	gl_Position = vec4(in_Position, 1.0);\n\
+	vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
+}";
+	const char* tOct2_fragShader =
+		"#version 330\n\
+in vec4 vert_Normal;\n\
+in vec4 colorFaces;\n\
+uniform mat4 mv_Mat; \n\
+out vec4 out_Color;\n\
+void main() {\n\
+	out_Color = colorFaces;\n\
+}";
+
+	const char* tOct2_geomShader[] =
+	{
+		"#version 330\n\
+layout(points) in;\n\
+layout(triangle_strip, max_vertices = 100) out; \n\
+uniform mat4 mvpMat;\n\
+uniform float c;\n\
+uniform float h;\n\
+uniform float aa;\n\
+out vec4 colorFaces;\n\
+void main() {\n\
+	vec4 offset = vec4(c, -aa, h-c, 0.0);\n\
+	vec4 offset1 = vec4(-c, -aa, h-c, 0.0);\n\
+	vec4 offset2 = vec4(aa, c, h-c, 0.0);\n\
+	vec4 offset3 = vec4(aa, -c, h-c,0.0);\n\
+	vec4 offset4 = vec4(c, -aa, -(h-c), 0.0);\n\
+	vec4 offset5 =  vec4(-c, -aa, -(h-c), 0.0);\n\
+	vec4 offset6 = vec4(-aa, c, -(h-c), 0.0);\n\
+	vec4 offset7 = vec4(-aa, -c, -(h-c),0.0);\n\
+	vec4 offset8 = vec4(c, h - c, aa, 0.0);\n\
+	vec4 offset9 = vec4(-c, h - c, -aa, 0.0);\n\
+	vec4 offset10 = vec4(-aa, h - c, c, 0.0);\n\
+	vec4 offset11 = vec4(aa, h - c, -c, 0.0);\n\
+	vec4 offset12 = vec4(c, -(h-c), -aa, 0.0);\n\
+	vec4 offset13 = vec4(-c, -(h-c), aa, 0.0);\n\
+	vec4 offset14 = vec4(-aa, -(h-c), c, 0.0);\n\
+	vec4 offset15 = vec4(aa, -(h-c), -c, 0.0);\n\
+	vec4 offset16 = vec4(h -c, c, -aa, 0.0);\n\
+	vec4 offset17 = vec4(h - c, -c, aa, 0.0);\n\
+	vec4 offset18 = vec4(h - c, aa, c, 0.0);\n\
+	vec4 offset19 = vec4(h - c, aa, -c, 0.0);\n\
+	vec4 offset20 = vec4(-(h-c), c, aa, 0.0);\n\
+	vec4 offset21 = vec4(-(h-c), -c, -aa, 0.0);\n\
+	vec4 offset22 = vec4(-(h-c), aa, c, 0.0);\n\
+	vec4 offset23 = vec4(-(h-c), aa, -c, 0.0);\n\
+	if(aa == 0){\n\
+			colorFaces = vec4(0.8f, 0.1f, 0.5f, 1.0f);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset15);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset15); \n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7); \n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset12); \n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17); \n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset15);\n\
+	EmitVertex(); \n\
+	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
+	EmitVertex(); \n\
+	EndPrimitive(); \n\
+	} \n\
+	else{\n\
+		colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
+		EmitVertex(); \n\
+		EndPrimitive(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
+		EmitVertex(); \n\
+		EndPrimitive(); \n\
+		colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
+		EmitVertex(); \n\
+		EndPrimitive(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
+		EmitVertex(); \n\
+		EndPrimitive(); \n\
+		colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
+		EmitVertex(); \n\
+		EndPrimitive(); \n\
+		colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
+		EmitVertex(); \n\
+		EndPrimitive(); \n\
+		colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
+		EmitVertex(); \n\
+		EndPrimitive(); \n\
+		colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset15);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
+		EmitVertex(); \n\
+		EndPrimitive(); \n\
+		colorFaces = vec4(0.8f, 0.1f, 0.5f, 1.0f);\n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
+		EmitVertex(); \n\
+		EndPrimitive(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
+		EmitVertex(); \n\
+		EndPrimitive(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
+		EmitVertex(); \n\
+		EndPrimitive(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
+		EmitVertex(); \n\
+		EndPrimitive(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset15);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
+		EmitVertex(); \n\
+		EndPrimitive(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset15);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
+		EmitVertex(); \n\
+		gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
+		EmitVertex(); \n\
+		EndPrimitive(); \n\
+	} \n\
+}"
+};
+
+	void setupTOct2() {
+
+		glGenVertexArrays(1, &tOct2Vao);
+		glBindVertexArray(tOct2Vao);
+		glGenBuffers(2, tOct2Vbo);
+
+		glBindBuffer(GL_ARRAY_BUFFER, tOct2Vbo[0]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(tOct2Verts), tOct2Verts, GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, tOct2Vbo[1]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(tOct2Norms), tOct2Norms, GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(1);
+
+		geom_shader2 = glCreateShader(GL_GEOMETRY_SHADER);
+		glShaderSource(geom_shader2, 1, tOct2_geomShader, NULL);
+
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		tOct2Shaders[0] = compileShader(tOct2_vertShader, GL_VERTEX_SHADER, "cubeVert");
+		tOct2Shaders[1] = compileShader(tOct2_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
+
+		tOct2Program = glCreateProgram();
+		glAttachShader(tOct2Program, tOct2Shaders[0]);
+		glAttachShader(tOct2Program, tOct2Shaders[1]);
+		glAttachShader(tOct2Program, geom_shader2);
+		glBindAttribLocation(tOct2Program, 0, "in_Position");
+		glBindAttribLocation(tOct2Program, 1, "in_Normal");
+		linkProgram(tOct2Program);
+	}
+	void cleanupTOct2() {
+		glDeleteBuffers(3, tOct2Vbo);
+		glDeleteVertexArrays(1, &tOct2Vao);
+
+		glDeleteProgram(tOct2Program);
+		glDeleteShader(tOct2Shaders[0]);
+		glDeleteShader(tOct2Shaders[1]);
+		glDeleteShader(geom_shader2);
+	}
+	void updateTOct2() {
+
+		if (sin(currentTime) > 0)
+		{
+			c = (1.065f * a) - (((1.065f * a) - (sqrt(pow(a, 2.0f) / 2))) * sin(currentTime));
+			aa = 0;
+		}
+		else
+		{
+			c = 1.065f * a;
+			aa = -sin(currentTime) * 0.33f;
+		}
+	}
+	void drawTOct2(float dt) {
+		glBindVertexArray(tOct2Vao);
+		glUseProgram(tOct2Program);
+		glUniformMatrix4fv(glGetUniformLocation(tOct2Program, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat2));
+		glUniformMatrix4fv(glGetUniformLocation(tOct2Program, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(tOct2Program, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniform1f(glGetUniformLocation(tOct2Program, "c"), c);
+		glUniform1f(glGetUniformLocation(tOct2Program, "h"), h);
+		glUniform1f(glGetUniformLocation(tOct2Program, "aa"), aa);
+		glDrawArrays(GL_POINTS, 0, numVerts);
+
+		updateTOct2();
+		glBindBuffer(GL_ARRAY_BUFFER, tOct2Vbo[0]);
+		float *buff2 = (float*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+		int j = 0;
+		for (int i = 0; i < 3; i += 3) {
+			buff2[i] = tOct2Verts[j].x;
+			buff2[i + 1] = tOct2Verts[j].y;
+			buff2[i + 2] = tOct2Verts[j].z;
+			j++;
+		}
+		glUnmapBuffer(GL_ARRAY_BUFFER);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 		glUseProgram(0);
 		glBindVertexArray(0);
@@ -834,8 +1502,11 @@ void main() {\n\
 	}
 }
 
+int exercise = 1;
+int lastExercise = 1;
 
 void GLinit(int width, int height) {
+	srand(time(NULL));
 	glViewport(0, 0, width, height);
 	glClearColor(0.2f, 0.2f, 0.2f, 1.f);
 	glClearDepth(1.f);
@@ -848,16 +1519,18 @@ void GLinit(int width, int height) {
 	// Setup shaders & geometry
 	Box::setupCube();
 	Axis::setupAxis();
-	//Cube::setupCube();
-	TOct::setupTOct();
+	if(exercise == 1) TOct::setupTOct();
+	else TOct2::setupTOct2();
 }
 
 void GLcleanup() {
 	Box::cleanupCube();
 	Axis::cleanupAxis();
-	//Cube::cleanupCube();
-	TOct::cleanupTOct();
+	if (exercise == 1) TOct::cleanupTOct();
+	else TOct2::cleanupTOct2();
 }
+
+
 
 void GLrender(float dt) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -869,10 +1542,16 @@ void GLrender(float dt) {
 
 	RV::_MVP = RV::_projection * RV::_modelView;
 
+	currentTime += dt;
+
 	Box::drawCube();
 	Axis::drawAxis();
-	TOct::drawTOct();
-	//Cube::drawCube();
+	if (exercise == 1 && lastExercise == 2) TOct::setupTOct();
+	else if (exercise == 2 && lastExercise == 1) TOct2::setupTOct2();
+	else if (exercise == 1) TOct::drawTOct(dt);
+	else if (exercise == 2) TOct2::drawTOct2(dt);
+	
+	lastExercise = exercise;
 
 	ImGui::Render();
 }
@@ -883,6 +1562,12 @@ void GUI() {
 
 	{
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+		if(exercise == 1)ImGui::DragFloat("Velocity", &TOct::velocity, 0.02f, 0.0f, 5.0f);
+		if (ImGui::Button("Switch exercise"))
+		{
+			if(exercise == 1) exercise = 2;
+			else if (exercise == 2) exercise = 1;
+		}
 	}
 
 	ImGui::End();
