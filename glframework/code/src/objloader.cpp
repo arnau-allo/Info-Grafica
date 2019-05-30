@@ -32,7 +32,10 @@ bool loadOBJ(
 		// read the first word of the line
 		int res = fscanf(file, "%s", lineHeader);
 		if (res == EOF)
+		{
+			printf("File ended\n");
 			break; // EOF = End Of File. Quit the loop.
+		}
 
 		// else : parse lineHeader
 
@@ -68,24 +71,23 @@ bool loadOBJ(
 			normalIndices.push_back(normalIndex[0]);
 			normalIndices.push_back(normalIndex[1]);
 			normalIndices.push_back(normalIndex[2]);
-
-			// For each vertex of each triangle
-			for (unsigned int i = 0; i < vertexIndices.size(); i++) {
-				unsigned int vertexIndex = vertexIndices[i];
-				glm::vec3 vertex = temp_vertices[vertexIndex - 1];
-				out_vertices.push_back(vertex);
-			}
-			for (unsigned int i = 0; i < uvIndices.size(); i++) {
-				unsigned int uvIndex = uvIndices[i];
-				glm::vec2 uv = temp_uvs[uvIndex - 1];
-				out_uvs.push_back(uv);
-			}
-			for (unsigned int i = 0; i < normalIndices.size(); i++) {
-				unsigned int normalIndex = normalIndices[i];
-				glm::vec3 normal = temp_normals[normalIndex - 1];
-				out_normals.push_back(normal);
-			}
 		}
+	}
+	// For each vertex of each triangle
+	for (unsigned int i = 0; i < vertexIndices.size(); i++) {
+		unsigned int vertexIndex = vertexIndices[i];
+		glm::vec3 vertex = temp_vertices[vertexIndex - 1];
+		out_vertices.push_back(vertex);
+	}
+	for (unsigned int i = 0; i < uvIndices.size(); i++) {
+		unsigned int uvIndex = uvIndices[i];
+		glm::vec2 uv = temp_uvs[uvIndex - 1];
+		out_uvs.push_back(uv);
+	}
+	for (unsigned int i = 0; i < normalIndices.size(); i++) {
+		unsigned int normalIndex = normalIndices[i];
+		glm::vec3 normal = temp_normals[normalIndex - 1];
+		out_normals.push_back(normal);
 	}
 	return true;
 }

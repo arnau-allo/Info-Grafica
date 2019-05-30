@@ -1,19 +1,26 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <vector>
+
 #include <GL\glew.h>
 #include <glm\gtc\type_ptr.hpp>
 #include <glm\gtc\matrix_transform.hpp>
 #include <cstdio>
-#include <iostream>
 #include <cassert>
-#include <time.h>
 
 #include <imgui\imgui.h>
 #include <imgui\imgui_impl_sdl_gl3.h>
 
 #include "GL_framework.h"
 
+#include "objloader.h"
+
 ///////// fw decl
 namespace ImGui {
-	void Render();
+	glm::vec3 lightPosition = { 10.f, 10.0f, 10.0f };
+	glm::vec3 lightColor = { 1.f, 1.f, 1.f };
+	float Velocity, PosX, PosY, PosZ, Diffuse, Specular, Ambient, LightPower;
+    void Render();
 }
 namespace Axis {
 	void setupAxis();
@@ -22,10 +29,12 @@ namespace Axis {
 }
 ////////////////
 
+
 namespace RenderVars {
 	const float FOV = glm::radians(65.f);
-	const float zNear = 1.f;
+	const float zNear = 0.01f;
 	const float zFar = 50.f;
+	bool lookingTrump = false;
 
 	glm::mat4 _projection;
 	glm::mat4 _modelView;
@@ -105,100 +114,6 @@ void linkProgram(GLuint program) {
 		glGetProgramInfoLog(program, res, &res, buff);
 		fprintf(stderr, "Error Link: %s", buff);
 		delete[] buff;
-	}
-}
-
-////////////////////////////////////////////////// BOX
-namespace Box {
-	GLuint cubeVao;
-	GLuint cubeVbo[2];
-	GLuint cubeShaders[2];
-	GLuint cubeProgram;
-
-	float cubeVerts[] = {
-		// -5,0,-5 -- 5, 10, 5
-		-5.f,  0.f, -5.f,
-		5.f,  0.f, -5.f,
-		5.f,  0.f,  5.f,
-		-5.f,  0.f,  5.f,
-		-5.f, 10.f, -5.f,
-		5.f, 10.f, -5.f,
-		5.f, 10.f,  5.f,
-		-5.f, 10.f,  5.f,
-	};
-	GLubyte cubeIdx[] = {
-		1, 0, 2, 3, // Floor - TriangleStrip
-		0, 1, 5, 4, // Wall - Lines
-		1, 2, 6, 5, // Wall - Lines
-		2, 3, 7, 6, // Wall - Lines
-		3, 0, 4, 7  // Wall - Lines
-	};
-
-	const char* vertShader_xform =
-		"#version 330\n\
-in vec3 in_Position;\n\
-uniform mat4 mvpMat;\n\
-void main() {\n\
-	gl_Position = mvpMat * vec4(in_Position, 1.0);\n\
-}";
-	const char* fragShader_flatColor =
-		"#version 330\n\
-out vec4 out_Color;\n\
-uniform vec4 color;\n\
-void main() {\n\
-	out_Color = color;\n\
-}";
-
-	void setupCube() {
-		glGenVertexArrays(1, &cubeVao);
-		glBindVertexArray(cubeVao);
-		glGenBuffers(2, cubeVbo);
-
-		glBindBuffer(GL_ARRAY_BUFFER, cubeVbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 24, cubeVerts, GL_STATIC_DRAW);
-		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(0);
-
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeVbo[1]);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLubyte) * 20, cubeIdx, GL_STATIC_DRAW);
-
-		glBindVertexArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-		cubeShaders[0] = compileShader(vertShader_xform, GL_VERTEX_SHADER, "cubeVert");
-		cubeShaders[1] = compileShader(fragShader_flatColor, GL_FRAGMENT_SHADER, "cubeFrag");
-
-		cubeProgram = glCreateProgram();
-		glAttachShader(cubeProgram, cubeShaders[0]);
-		glAttachShader(cubeProgram, cubeShaders[1]);
-		glBindAttribLocation(cubeProgram, 0, "in_Position");
-		linkProgram(cubeProgram);
-	}
-	void cleanupCube() {
-		glDeleteBuffers(2, cubeVbo);
-		glDeleteVertexArrays(1, &cubeVao);
-
-		glDeleteProgram(cubeProgram);
-		glDeleteShader(cubeShaders[0]);
-		glDeleteShader(cubeShaders[1]);
-	}
-	void drawCube() {
-		glBindVertexArray(cubeVao);
-		glUseProgram(cubeProgram);
-		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RV::_MVP));
-		// FLOOR
-		glUniform4f(glGetUniformLocation(cubeProgram, "color"), 0.6f, 0.6f, 0.6f, 1.f);
-		glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_BYTE, 0);
-		// WALLS
-		glUniform4f(glGetUniformLocation(cubeProgram, "color"), 0.f, 0.f, 0.f, 1.f);
-		glDrawElements(GL_LINE_LOOP, 4, GL_UNSIGNED_BYTE, (void*)(sizeof(GLubyte) * 4));
-		glDrawElements(GL_LINE_LOOP, 4, GL_UNSIGNED_BYTE, (void*)(sizeof(GLubyte) * 8));
-		glDrawElements(GL_LINE_LOOP, 4, GL_UNSIGNED_BYTE, (void*)(sizeof(GLubyte) * 12));
-		glDrawElements(GL_LINE_LOOP, 4, GL_UNSIGNED_BYTE, (void*)(sizeof(GLubyte) * 16));
-
-		glUseProgram(0);
-		glBindVertexArray(0);
 	}
 }
 
@@ -299,1057 +214,6 @@ void main() {\n\
 	}
 }
 
-namespace TOct {
-	GLuint tOctVao;
-	GLuint tOctVbo[3];
-	GLuint tOctShaders[2];
-	GLuint tOctProgram;
-	GLuint geom_shader;
-	glm::mat4 objMat = glm::mat4(1.f);
-
-	extern const float a = 0.1f;
-	const float h = 3 * a * sqrt(2) / 2;
-	const float c = sqrt(pow(a, 2.0f) / 2);
-	int numVerts = 20; // 4 vertex/face * 22 faces + 22 PRIMITIVE RESTART
-	float velocity = 0.5f;
-
-	glm::vec3 tOctdirections[20];
-
-	glm::vec3 tOctVerts[20];
-
-	glm::vec3 tOctNorms[] = {
-		glm::vec3(0.f, 0.f, 1.f)
-	};
-	GLubyte tOctIdx[] = {
-		0
-	};
-
-	//glm::vec3 verts[] = {
-	//	glm::vec3(0, 1, 1),
-	//	glm::vec3(0, -1, 1),
-	//	glm::vec3(1, 0, 1),
-	//	glm::vec3(-1, 0, 1),
-	//	/*glm::vec3(h, 0, 0),
-	//	glm::vec3(-h, 0, 0),
-	//	glm::vec3(0, h, 0),
-	//	glm::vec3(0, -h, 0),
-	//	glm::vec3(0, 0, -h)*/
-	//};
-
-	//glm::vec3 norms[] = {
-	//	glm::vec3(0, 0, h),
-	//	/*glm::vec3(h, h, h),
-	//	glm::vec3(h, -h, h),
-	//	glm::vec3(-h, h, h),
-	//	glm::vec3(-h, -h, h),
-	//	glm::vec3(h, h, -h),
-	//	glm::vec3(h, -h, -h),
-	//	glm::vec3(-h, h, -h),
-	//	glm::vec3(-h, -h, -h)*/
-	//};
-
-	//glm::vec3 tOctVerts[] = {
-	//	verts[0], verts[1], verts[3], verts[4]
-	//};
-
-	//glm::vec3 tOctNorms[] = {
-	//	norms[0], norms[0], norms[0], norms[0]
-	//};
-
-	const char* tOct_vertShader =
-		"#version 330\n\
-in vec3 in_Position;\n\
-in vec3 in_Normal;\n\
-out vec4 vert_Normal;\n\
-uniform mat4 objMat;\n\
-uniform mat4 mv_Mat;\n\
-uniform mat4 mvpMat;\n\
-void main() {\n\
-	gl_Position = vec4(in_Position, 1.0);\n\
-	vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
-}";
-	const char* tOct_fragShader =
-		"#version 330\n\
-in vec4 vert_Normal;\n\
-in vec4 colorFaces;\n\
-uniform mat4 mv_Mat; \n\
-out vec4 out_Color;\n\
-void main() {\n\
-	out_Color = colorFaces;\n\
-}";
-
-	const char* tOct_geomShader[] =
-	{
-		"#version 330\n\
-layout(points) in;\n\
-layout(triangle_strip, max_vertices = 100) out; \n\
-uniform mat4 mvpMat;\n\
-uniform float c;\n\
-uniform float h;\n\
-out vec4 colorFaces;\n\
-void main() {\n\
-	vec4 offset = vec4(c, 0, h-c, 0.0);\n\
-	vec4 offset1 = vec4(-c, 0, h-c, 0.0);\n\
-	vec4 offset2 = vec4(0, c, h-c, 0.0);\n\
-	vec4 offset3 = vec4(0, -c, h-c,0.0);\n\
-	vec4 offset4 = vec4(c, 0, -(h-c), 0.0);\n\
-	vec4 offset5 =  vec4(-c, 0, -(h-c), 0.0);\n\
-	vec4 offset6 = vec4(0, c, -(h-c), 0.0);\n\
-	vec4 offset7 = vec4(0, -c, -(h-c),0.0);\n\
-	vec4 offset8 = vec4(c, h - c, 0, 0.0);\n\
-	vec4 offset9 = vec4(-c, h - c, 0, 0.0);\n\
-	vec4 offset10 = vec4(0, h - c, c, 0.0);\n\
-	vec4 offset11 = vec4(0, h - c, -c, 0.0);\n\
-	vec4 offset12 = vec4(c, -(h-c), 0, 0.0);\n\
-	vec4 offset13 = vec4(-c, -(h-c), 0, 0.0);\n\
-	vec4 offset14 = vec4(0, -(h-c), c, 0.0);\n\
-	vec4 offset15 = vec4(0, -(h-c), -c, 0.0);\n\
-	vec4 offset16 = vec4(h -c, c, 0, 0.0);\n\
-	vec4 offset17 = vec4(h - c, -c, 0, 0.0);\n\
-	vec4 offset18 = vec4(h - c, 0, c, 0.0);\n\
-	vec4 offset19 = vec4(h - c, 0, -c, 0.0);\n\
-	vec4 offset20 = vec4(-(h-c), c, 0, 0.0);\n\
-	vec4 offset21 = vec4(-(h-c), -c, 0, 0.0);\n\
-	vec4 offset22 = vec4(-(h-c), 0, c, 0.0);\n\
-	vec4 offset23 = vec4(-(h-c), 0, -c, 0.0);\n\
-	colorFaces = vec4(0.8f, 0.1f, 0.5f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset15);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset15); \n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7); \n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset12); \n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17); \n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset15);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-}"/*"#version 330\n\
-  layout(points) in;\n\
-  layout(triangle_strip, max_vertices = 100) out;\n\
-  uniform mat4 mvpMat; \n\
-
-  }" */ };
-
-	void setupTOct() {
-		for (int i = 0; i < 20; i++)
-			tOctVerts[i] = glm::vec3((rand() % 100) / 10.f - 5, rand() % 100 / 10.f, (rand() % 100) / 10.f - 5);
-
-		for (int i = 0; i < 20; i++)
-			tOctdirections[i] = glm::vec3((rand() % 100) / 10.f - 5, rand() % 100 / 10.f, (rand() % 100) / 10.f - 5);
-
-		glGenVertexArrays(1, &tOctVao);
-		glBindVertexArray(tOctVao);
-		glGenBuffers(2, tOctVbo);
-
-		glBindBuffer(GL_ARRAY_BUFFER, tOctVbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(tOctVerts), tOctVerts, GL_STATIC_DRAW);
-		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(0);
-
-		glBindBuffer(GL_ARRAY_BUFFER, tOctVbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(tOctNorms), tOctNorms, GL_STATIC_DRAW);
-		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(1);
-
-		geom_shader = glCreateShader(GL_GEOMETRY_SHADER);
-		glShaderSource(geom_shader, 1, tOct_geomShader, NULL);
-
-		glBindVertexArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-		tOctShaders[0] = compileShader(tOct_vertShader, GL_VERTEX_SHADER, "cubeVert");
-		tOctShaders[1] = compileShader(tOct_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
-
-		tOctProgram = glCreateProgram();
-		glAttachShader(tOctProgram, tOctShaders[0]);
-		glAttachShader(tOctProgram, tOctShaders[1]);
-		glAttachShader(tOctProgram, geom_shader);
-		glBindAttribLocation(tOctProgram, 0, "in_Position");
-		glBindAttribLocation(tOctProgram, 1, "in_Normal");
-		linkProgram(tOctProgram);
-	}
-	void cleanupTOct() {
-		glDeleteBuffers(3, tOctVbo);
-		glDeleteVertexArrays(1, &tOctVao);
-
-		glDeleteProgram(tOctProgram);
-		glDeleteShader(tOctShaders[0]);
-		glDeleteShader(tOctShaders[1]);
-		glDeleteShader(geom_shader);
-	}
-	void updateTOct() {
-		for (int i = 0; i < 20; i++)
-		{
-			if (tOctVerts[i].x < -5 || tOctVerts[i].x > 5) {
-				tOctdirections[i] = glm::vec3(-tOctdirections[i].x, rand() % 10, (rand() % 10) - 5);
-				if (tOctVerts[i].x > 5) tOctVerts[i].x = 5;
-				else tOctVerts[i].x = -5;
-			}
-			else if (tOctVerts[i].y < 0 || tOctVerts[i].y > 10) {
-				tOctdirections[i] = glm::vec3((rand() % 10) - 5, -tOctdirections[i].y, (rand() % 10) - 5);
-				if (tOctVerts[i].y > 10) tOctVerts[i].y = 10;
-				else tOctVerts[i].y = 0;
-			}
-			else if (tOctVerts[i].z < -5 || tOctVerts[i].z > 5) {
-				tOctdirections[i] = glm::vec3((rand() % 10) - 5, rand() % 10, -tOctdirections[i].z);
-				if (tOctVerts[i].z > 5) tOctVerts[i].z = 5;
-				else tOctVerts[i].z = -5;
-			}
-
-			tOctVerts[i] += glm::vec3(tOctdirections[i].x * (velocity / 100.f), tOctdirections[i].y * (velocity / 100.f), tOctdirections[i].z * (velocity / 100.f));
-		}
-	}
-	void drawTOct(float dt) {
-		glBindVertexArray(tOctVao);
-		glUseProgram(tOctProgram);
-		glUniformMatrix4fv(glGetUniformLocation(tOctProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(tOctProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(tOctProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		glUniform1f(glGetUniformLocation(tOctProgram, "c"), c);
-		glUniform1f(glGetUniformLocation(tOctProgram, "h"), h);
-		glDrawArrays(GL_POINTS, 0, numVerts);
-
-		updateTOct();
-		glBindBuffer(GL_ARRAY_BUFFER, tOctVbo[0]);
-		float *buff = (float*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
-		int j = 0;
-		for (int i = 0; i < 60; i += 3) {
-			buff[i] = tOctVerts[j].x;
-			buff[i + 1] = tOctVerts[j].y;
-			buff[i + 2] = tOctVerts[j].z;
-			j++;
-		}
-		glUnmapBuffer(GL_ARRAY_BUFFER);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-		glUseProgram(0);
-		glBindVertexArray(0);
-	}
-}
-
-float currentTime = 0;
-
-namespace TOct2 {
-	GLuint tOct2Vao;
-	GLuint tOct2Vbo[3];
-	GLuint tOct2Shaders[2];
-	GLuint tOct2Program;
-	GLuint geom_shader2;
-	glm::mat4 objMat2 = glm::mat4(1.f);
-
-	extern const float a = 0.3f;
-	const float h = 3 * a * sqrt(2) / 2;
-	float c = sqrt(pow(a, 2.0f) / 2); //a * 1.065f;
-	int numVerts = 25; // 4 vertex/face * 22 faces + 22 PRIMITIVE RESTART
-	float velocity = 0.5f;
-	float aa = 0;
-
-	glm::vec3 tOct2directions[20];
-
-	//glm::vec3 tOct2Verts[20];
-
-	glm::vec3 tOct2Verts[]
-	{
-		glm::vec3(-(4 * a), 5 + (4 * a), -a),
-		glm::vec3(-(2 * a), 5 + (4 * a), a),
-		glm::vec3(0 , 5 + (4 * a), -a),
-		glm::vec3(2 * a, 5 + (4 * a), a),
-		glm::vec3(4 * a, 5 + (4 * a), -a),
-		glm::vec3(-(4 * a), 5 + (2 * a), a),
-		glm::vec3(-(2 * a), 5 + (2 * a), -a),
-		glm::vec3(0, 5 + (2 * a), a),
-		glm::vec3(2 * a, 5 + (2 * a), -a),
-		glm::vec3(4 * a, 5 + (2 * a), a),
-		glm::vec3(-(4 * a), 5, -a),
-		glm::vec3(-(2 * a), 5, a),
-		glm::vec3(0, 5, -a),
-		glm::vec3(2 * a, 5, a),
-		glm::vec3(4 * a, 5, -a),
-		glm::vec3(-(4 * a), 5 - (2 * a), a),
-		glm::vec3(-(2 * a), 5 - (2 * a), -a),
-		glm::vec3(0, 5 - (2 * a), a),
-		glm::vec3(2 * a, 5 - (2 * a), -a),
-		glm::vec3(4 * a, 5 - (2 * a), a),
-		glm::vec3(-(4 * a), 5 - (4 * a), -a),
-		glm::vec3(-(2 * a), 5 - (4 * a), a),
-		glm::vec3(0, 5 - (4 * a), -a),
-		glm::vec3(2 * a, 5 - (4 * a), a),
-		glm::vec3(4 * a, 5 - (4 * a), -a)
-	};
-
-	glm::vec3 tOct2Norms[] = {
-		glm::vec3(0.f, 0.f, 1.f)
-	};
-	GLubyte tOct2Idx[] = {
-		0
-	};
-
-	//glm::vec3 verts[] = {
-	//	glm::vec3(0, 1, 1),
-	//	glm::vec3(0, -1, 1),
-	//	glm::vec3(1, 0, 1),
-	//	glm::vec3(-1, 0, 1),
-	//	/*glm::vec3(h, 0, 0),
-	//	glm::vec3(-h, 0, 0),
-	//	glm::vec3(0, h, 0),
-	//	glm::vec3(0, -h, 0),
-	//	glm::vec3(0, 0, -h)*/
-	//};
-
-	//glm::vec3 norms[] = {
-	//	glm::vec3(0, 0, h),
-	//	/*glm::vec3(h, h, h),
-	//	glm::vec3(h, -h, h),
-	//	glm::vec3(-h, h, h),
-	//	glm::vec3(-h, -h, h),
-	//	glm::vec3(h, h, -h),
-	//	glm::vec3(h, -h, -h),
-	//	glm::vec3(-h, h, -h),
-	//	glm::vec3(-h, -h, -h)*/
-	//};
-
-	//glm::vec3 tOctVerts[] = {
-	//	verts[0], verts[1], verts[3], verts[4]
-	//};
-
-	//glm::vec3 tOctNorms[] = {
-	//	norms[0], norms[0], norms[0], norms[0]
-	//};
-
-	const char* tOct2_vertShader =
-		"#version 330\n\
-in vec3 in_Position;\n\
-in vec3 in_Normal;\n\
-out vec4 vert_Normal;\n\
-uniform mat4 objMat;\n\
-uniform mat4 mv_Mat;\n\
-uniform mat4 mvpMat;\n\
-void main() {\n\
-	gl_Position = vec4(in_Position, 1.0);\n\
-	vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
-}";
-	const char* tOct2_fragShader =
-		"#version 330\n\
-in vec4 vert_Normal;\n\
-in vec4 colorFaces;\n\
-uniform mat4 mv_Mat; \n\
-out vec4 out_Color;\n\
-void main() {\n\
-	out_Color = colorFaces;\n\
-}";
-
-	const char* tOct2_geomShader[] =
-	{
-		"#version 330\n\
-layout(points) in;\n\
-layout(triangle_strip, max_vertices = 100) out; \n\
-uniform mat4 mvpMat;\n\
-uniform float c;\n\
-uniform float h;\n\
-uniform float aa;\n\
-out vec4 colorFaces;\n\
-void main() {\n\
-	vec4 offset = vec4(c, -aa, h-c, 0.0);\n\
-	vec4 offset1 = vec4(-c, -aa, h-c, 0.0);\n\
-	vec4 offset2 = vec4(aa, c, h-c, 0.0);\n\
-	vec4 offset3 = vec4(aa, -c, h-c,0.0);\n\
-	vec4 offset4 = vec4(c, -aa, -(h-c), 0.0);\n\
-	vec4 offset5 =  vec4(-c, -aa, -(h-c), 0.0);\n\
-	vec4 offset6 = vec4(-aa, c, -(h-c), 0.0);\n\
-	vec4 offset7 = vec4(-aa, -c, -(h-c),0.0);\n\
-	vec4 offset8 = vec4(c, h - c, aa, 0.0);\n\
-	vec4 offset9 = vec4(-c, h - c, -aa, 0.0);\n\
-	vec4 offset10 = vec4(-aa, h - c, c, 0.0);\n\
-	vec4 offset11 = vec4(aa, h - c, -c, 0.0);\n\
-	vec4 offset12 = vec4(c, -(h-c), -aa, 0.0);\n\
-	vec4 offset13 = vec4(-c, -(h-c), aa, 0.0);\n\
-	vec4 offset14 = vec4(-aa, -(h-c), c, 0.0);\n\
-	vec4 offset15 = vec4(aa, -(h-c), -c, 0.0);\n\
-	vec4 offset16 = vec4(h -c, c, -aa, 0.0);\n\
-	vec4 offset17 = vec4(h - c, -c, aa, 0.0);\n\
-	vec4 offset18 = vec4(h - c, aa, c, 0.0);\n\
-	vec4 offset19 = vec4(h - c, aa, -c, 0.0);\n\
-	vec4 offset20 = vec4(-(h-c), c, aa, 0.0);\n\
-	vec4 offset21 = vec4(-(h-c), -c, -aa, 0.0);\n\
-	vec4 offset22 = vec4(-(h-c), aa, c, 0.0);\n\
-	vec4 offset23 = vec4(-(h-c), aa, -c, 0.0);\n\
-	if(aa == 0){\n\
-			colorFaces = vec4(0.8f, 0.1f, 0.5f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset15);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset15); \n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7); \n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset12); \n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset17); \n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset15);\n\
-	EmitVertex(); \n\
-	gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
-	EmitVertex(); \n\
-	EndPrimitive(); \n\
-	} \n\
-	else{\n\
-		colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
-		EmitVertex(); \n\
-		EndPrimitive(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
-		EmitVertex(); \n\
-		EndPrimitive(); \n\
-		colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
-		EmitVertex(); \n\
-		EndPrimitive(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
-		EmitVertex(); \n\
-		EndPrimitive(); \n\
-		colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
-		EmitVertex(); \n\
-		EndPrimitive(); \n\
-		colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
-		EmitVertex(); \n\
-		EndPrimitive(); \n\
-		colorFaces = vec4(0.2, 0.5, 0.2, 1.0);\n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
-		EmitVertex(); \n\
-		EndPrimitive(); \n\
-		colorFaces = vec4(0.5f, 0.8f, 0.1f, 1.0f); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset15);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
-		EmitVertex(); \n\
-		EndPrimitive(); \n\
-		colorFaces = vec4(0.8f, 0.1f, 0.5f, 1.0f);\n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
-		EmitVertex(); \n\
-		EndPrimitive(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset1);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset22);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
-		EmitVertex(); \n\
-		EndPrimitive(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset2);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset10);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset20);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset9);\n\
-		EmitVertex(); \n\
-		EndPrimitive(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset18);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset8);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset16);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
-		EmitVertex(); \n\
-		EndPrimitive(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset3);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset14);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset17);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset13);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset12);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset21);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset15);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
-		EmitVertex(); \n\
-		EndPrimitive(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset19);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset4);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset11);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset15);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset6);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset7);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset23);\n\
-		EmitVertex(); \n\
-		gl_Position = mvpMat * (gl_in[0].gl_Position + offset5);\n\
-		EmitVertex(); \n\
-		EndPrimitive(); \n\
-	} \n\
-}"
-};
-
-	void setupTOct2() {
-
-		glGenVertexArrays(1, &tOct2Vao);
-		glBindVertexArray(tOct2Vao);
-		glGenBuffers(2, tOct2Vbo);
-
-		glBindBuffer(GL_ARRAY_BUFFER, tOct2Vbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(tOct2Verts), tOct2Verts, GL_STATIC_DRAW);
-		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(0);
-
-		glBindBuffer(GL_ARRAY_BUFFER, tOct2Vbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(tOct2Norms), tOct2Norms, GL_STATIC_DRAW);
-		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(1);
-
-		geom_shader2 = glCreateShader(GL_GEOMETRY_SHADER);
-		glShaderSource(geom_shader2, 1, tOct2_geomShader, NULL);
-
-		glBindVertexArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-		tOct2Shaders[0] = compileShader(tOct2_vertShader, GL_VERTEX_SHADER, "cubeVert");
-		tOct2Shaders[1] = compileShader(tOct2_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
-
-		tOct2Program = glCreateProgram();
-		glAttachShader(tOct2Program, tOct2Shaders[0]);
-		glAttachShader(tOct2Program, tOct2Shaders[1]);
-		glAttachShader(tOct2Program, geom_shader2);
-		glBindAttribLocation(tOct2Program, 0, "in_Position");
-		glBindAttribLocation(tOct2Program, 1, "in_Normal");
-		linkProgram(tOct2Program);
-	}
-	void cleanupTOct2() {
-		glDeleteBuffers(3, tOct2Vbo);
-		glDeleteVertexArrays(1, &tOct2Vao);
-
-		glDeleteProgram(tOct2Program);
-		glDeleteShader(tOct2Shaders[0]);
-		glDeleteShader(tOct2Shaders[1]);
-		glDeleteShader(geom_shader2);
-	}
-	void updateTOct2() {
-
-		if (sin(currentTime) > 0)
-		{
-			c = (1.065f * a) - (((1.065f * a) - (sqrt(pow(a, 2.0f) / 2))) * sin(currentTime));
-			aa = 0;
-		}
-		else
-		{
-			c = 1.065f * a;
-			aa = -sin(currentTime) * 0.33f;
-		}
-	}
-	void drawTOct2(float dt) {
-		glBindVertexArray(tOct2Vao);
-		glUseProgram(tOct2Program);
-		glUniformMatrix4fv(glGetUniformLocation(tOct2Program, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat2));
-		glUniformMatrix4fv(glGetUniformLocation(tOct2Program, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(tOct2Program, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		glUniform1f(glGetUniformLocation(tOct2Program, "c"), c);
-		glUniform1f(glGetUniformLocation(tOct2Program, "h"), h);
-		glUniform1f(glGetUniformLocation(tOct2Program, "aa"), aa);
-		glDrawArrays(GL_POINTS, 0, numVerts);
-
-		updateTOct2();
-		glBindBuffer(GL_ARRAY_BUFFER, tOct2Vbo[0]);
-		float *buff2 = (float*)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
-		int j = 0;
-		for (int i = 0; i < 3; i += 3) {
-			buff2[i] = tOct2Verts[j].x;
-			buff2[i + 1] = tOct2Verts[j].y;
-			buff2[i + 2] = tOct2Verts[j].z;
-			j++;
-		}
-		glUnmapBuffer(GL_ARRAY_BUFFER);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-		glUseProgram(0);
-		glBindVertexArray(0);
-	}
-}
-
 ////////////////////////////////////////////////// CUBE
 namespace Cube {
 	GLuint cubeVao;
@@ -1357,6 +221,7 @@ namespace Cube {
 	GLuint cubeShaders[2];
 	GLuint cubeProgram;
 	glm::mat4 objMat = glm::mat4(1.f);
+	glm::vec3 objColor = { 0.1f, 1.f, 1.f};
 
 	extern const float halfW = 0.5f;
 	int numVerts = 24 + 6; // 4 vertex/face * 6 faces + 6 PRIMITIVE RESTART
@@ -1418,28 +283,21 @@ namespace Cube {
 in vec3 in_Position;\n\
 in vec3 in_Normal;\n\
 out vec4 vert_Normal;\n\
-out vec3 vec_light;\n\
 uniform mat4 objMat;\n\
 uniform mat4 mv_Mat;\n\
 uniform mat4 mvpMat;\n\
 void main() {\n\
-	gl_Position = mvpMat * objMat * vec4(in_Position + vec3(0, 5, 0), 1.0);\n\
+	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
 	vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
-	vec_light = vec3(mv_Mat * objMat * vec4(10.0f, 10.0f, 10.0f, 0.0));\n\
 }";
 	const char* cube_fragShader =
 		"#version 330\n\
 in vec4 vert_Normal;\n\
 out vec4 out_Color;\n\
 uniform mat4 mv_Mat;\n\
-in vec3 vec_light;\n\
-vec3 diffuse_color;\n\
-float cosTheta;\n\
 uniform vec4 color;\n\
 void main() {\n\
-	cosTheta = (clamp(dot(normalize(vert_Normal).xyz, normalize(vec_light)), 0, 1));\n\
-	diffuse_color = (color.xyz * cosTheta);\n\
-	out_Color = vec4(diffuse_color, 1);\n\
+	out_Color = vec4(color.xyz * dot(vert_Normal, mv_Mat*vec4(0.0, 1.0, 0.0, 0.0)) + color.xyz * 0.3, 1.0 );\n\
 }";
 
 	void setupCube() {
@@ -1474,6 +332,7 @@ void main() {\n\
 		glBindAttribLocation(cubeProgram, 0, "in_Position");
 		glBindAttribLocation(cubeProgram, 1, "in_Normal");
 		linkProgram(cubeProgram);
+		objMat = glm::translate(objMat, glm::vec3(0.0f, 5.0f, 0.0f));
 	}
 	void cleanupCube() {
 		glDeleteBuffers(3, cubeVbo);
@@ -1490,10 +349,10 @@ void main() {\n\
 		glEnable(GL_PRIMITIVE_RESTART);
 		glBindVertexArray(cubeVao);
 		glUseProgram(cubeProgram);
+
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		glUniform4f(glGetUniformLocation(cubeProgram, "color"), 0.1f, 1.f, 1.f, 0.f);
 		glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
 
 		glUseProgram(0);
@@ -1502,58 +361,932 @@ void main() {\n\
 	}
 }
 
-int exercise = 1;
-int lastExercise = 1;
+
+namespace Object {
+
+	std::vector< glm::vec3 > vertices;
+	std::vector< glm::vec2 > uvs;
+	std::vector< glm::vec3 > normals;
+
+	GLuint objectVao;
+	GLuint objectVbo[3];
+	GLuint objectShaders[2];
+	GLuint objectProgram;
+
+	glm::mat4 objMat = glm::mat4(1.f);
+	glm::vec4 objColor = { 0.1f, 1.f, 1.f, 0.f };
+
+	const char* object_vertShader =
+		"#version 330\n\
+in vec3 in_Position;\n\
+in vec3 in_Normal;\n\
+out vec3 vert_Normal;\n\
+out vec3 fragPos;\n\
+out vec3 vec_light;\n\
+uniform mat4 objMat;\n\
+uniform mat4 mv_Mat;\n\
+uniform mat4 mvpMat;\n\
+uniform vec3 light_Position;\n\
+void main() {\n\
+	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
+	fragPos = vec3(mv_Mat * objMat * vec4(in_Position, 1.0));\n\
+	vert_Normal = vec3(mv_Mat * objMat * vec4(in_Normal, 0.0));\n\
+	vec_light = vec3(mv_Mat * objMat * vec4(light_Position, 0.0));\n\
+}";
+
+	const char* object_fragShader =
+		"#version 330\n\
+in vec3 vert_Normal;\n\
+in vec3 fragPos;\n\
+in vec3 vec_light;\n\
+vec3 e;\n\
+vec3 ambient_light;\n\
+vec3 diffuse_color;\n\
+vec3 specular_light;\n\
+out vec4 out_Color;\n\
+uniform mat4 mv_Mat;\n\
+uniform vec3 color;\n\
+uniform vec3 light_Color;\n\
+uniform float kd;\n\
+uniform float ka;\n\
+uniform float ks;\n\
+uniform float light_Power;\n\
+float cosTheta;\n\
+float cosAlpha;\n\
+float distance;\n\
+vec3 r;\n\
+uniform vec3 camera_Point;\n\
+void main() {\n\
+	ambient_light = ka * color.xyz;\n\
+	cosTheta = (clamp(dot(normalize(vert_Normal), normalize(vec_light)), 0, 1));\n\
+	diffuse_color =  kd * (color.xyz * light_Color * light_Power * cosTheta);\n\
+	r = reflect(-vec_light, vert_Normal);\n\
+	e = normalize(-fragPos);\n\
+	cosAlpha = dot(e, r);\n\
+	specular_light = ks * color.xyz * light_Color *  pow(max(cosAlpha, 0.0), 0.2f);\n\
+	out_Color = vec4(ambient_light + diffuse_color + specular_light, 0);\n\
+}";
+
+	void setupObject() {
+		glBufferData(GL_ARRAY_BUFFER, Object::vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
+
+		glGenVertexArrays(1, &objectVao);
+		glBindVertexArray(objectVao);
+		glGenBuffers(2, objectVbo);
+
+		glBindBuffer(GL_ARRAY_BUFFER, objectVbo[0]);
+		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, objectVbo[1]);
+		glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(1);
+
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		objectShaders[0] = compileShader(object_vertShader, GL_VERTEX_SHADER, "cubeVert");
+		objectShaders[1] = compileShader(object_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
+
+		objectProgram = glCreateProgram();
+		glAttachShader(objectProgram, objectShaders[0]);
+		glAttachShader(objectProgram, objectShaders[1]);
+		glBindAttribLocation(objectProgram, 0, "in_Position");
+		glBindAttribLocation(objectProgram, 1, "in_Normal");
+		linkProgram(objectProgram);
+
+	}
+
+	void cleanupObject() {
+		glDeleteBuffers(2, objectVbo);
+		glDeleteVertexArrays(1, &objectVao);
+
+		glDeleteProgram(objectProgram);
+		glDeleteShader(objectShaders[0]);
+		glDeleteShader(objectShaders[1]);
+	}
+
+	void drawObject(float currentTime) {
+
+		glBindVertexArray(objectVao);
+		glUseProgram(objectProgram);
+
+		glUniformMatrix4fv(glGetUniformLocation(objectProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(objectProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(objectProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniform3f(glGetUniformLocation(objectProgram, "light_Position"), ImGui::lightPosition[0], ImGui::lightPosition[1], ImGui::lightPosition[2]);
+		glUniform3f(glGetUniformLocation(objectProgram, "color"), objColor[0], objColor[1], objColor[2]);
+		glUniform3f(glGetUniformLocation(objectProgram, "light_Color"), ImGui::lightColor[0], ImGui::lightColor[1], ImGui::lightColor[2]);
+		glUniformMatrix4fv(glGetUniformLocation(objectProgram, "camera_Point"), 1, GL_FALSE, glm::value_ptr(RenderVars::_cameraPoint));
+		glUniform1f(glGetUniformLocation(objectProgram, "kd"), ImGui::Diffuse);
+		glUniform1f(glGetUniformLocation(objectProgram, "ka"), ImGui::Ambient);
+		glUniform1f(glGetUniformLocation(objectProgram, "ks"), ImGui::Specular);
+		glUniform1f(glGetUniformLocation(objectProgram, "light_Power"), ImGui::LightPower);
+		glDrawArrays(GL_TRIANGLES, 0, Object::vertices.size());
+
+		glUseProgram(0);
+		glBindVertexArray(0);
+
+	}
+
+}
+
+
+
+////////////////////////////////////////////////// GALLINA
+namespace Gallina {
+
+	std::vector< glm::vec3 > vertices;
+	std::vector< glm::vec2 > uvs;
+	std::vector< glm::vec3 > normals;
+	float lastX;
+	float lastY;
+	float angle;
+	GLuint gallinaVao;
+	GLuint gallinaVbo[3];
+	GLuint gallinaShaders[2];
+	GLuint gallinaProgram;
+
+	glm::mat4 gallinaMat = glm::mat4(1.f);
+	glm::vec4 gallinaColor = { 0.1f, 1.f, 1.f, 0.f };
+
+	const char* gallina_vertShader =
+		"#version 330\n\
+in vec3 in_Position;\n\
+in vec3 in_Normal;\n\
+out vec3 vert_Normal;\n\
+out vec3 fragPos;\n\
+uniform mat4 objMat;\n\
+uniform mat4 mv_Mat;\n\
+uniform mat4 mvpMat;\n\
+void main() {\n\
+	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
+	fragPos = vec3(mv_Mat * objMat * vec4(in_Position, 1.0));\n\
+	vert_Normal = vec3(mv_Mat * objMat * vec4(in_Normal, 0.0));\n\
+}";
+	const char* gallina_fragShader =
+		"#version 330\n\
+in vec3 vert_Normal;\n\
+in vec3 fragPos;\n\
+out vec4 out_Color;\n\
+uniform mat4 mv_Mat;\n\
+uniform vec4 Color;\n\
+void main() {\n\
+	out_Color = Color;\n\
+}";
+
+	void setupGallina() {
+		glBufferData(GL_ARRAY_BUFFER, Gallina::vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
+
+		glGenVertexArrays(1, &gallinaVao);
+		glBindVertexArray(gallinaVao);
+		glGenBuffers(2, gallinaVbo);
+
+		glBindBuffer(GL_ARRAY_BUFFER, gallinaVbo[0]);
+		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, gallinaVbo[1]);
+		glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(1);
+
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		gallinaShaders[0] = compileShader(gallina_vertShader, GL_VERTEX_SHADER, "cubeVert");
+		gallinaShaders[1] = compileShader(gallina_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
+
+		gallinaProgram = glCreateProgram();
+		glAttachShader(gallinaProgram, gallinaShaders[0]);
+		glAttachShader(gallinaProgram, gallinaShaders[1]);
+		glBindAttribLocation(gallinaProgram, 0, "in_Position");
+		glBindAttribLocation(gallinaProgram, 1, "in_Normal");
+		linkProgram(gallinaProgram);
+
+		gallinaMat = glm::rotate(gallinaMat, (float)glm::radians(90.0f), glm::vec3(0, 1, 0));
+		gallinaMat = glm::translate(gallinaMat, glm::vec3(-0.2f, 5.8f, 5.4f));//-0.15, 11.35
+		lastX = 5.4f;
+		lastY = 5.8;
+		angle = 0.0f;
+	}
+
+	void cleanupGallina() {
+		glDeleteBuffers(2, gallinaVbo);
+		glDeleteVertexArrays(1, &gallinaVao);
+
+		glDeleteProgram(gallinaProgram);
+		glDeleteShader(gallinaShaders[0]);
+		glDeleteShader(gallinaShaders[1]);
+	}
+
+	void drawGallina(float currentTime) {
+
+		glBindVertexArray(gallinaVao);
+		glUseProgram(gallinaProgram);
+
+		glUniformMatrix4fv(glGetUniformLocation(gallinaProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(gallinaMat));
+		glUniformMatrix4fv(glGetUniformLocation(gallinaProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(gallinaProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniform4f(glGetUniformLocation(gallinaProgram, "Color"), gallinaColor[0], gallinaColor[1], gallinaColor[2], gallinaColor[3]);
+		glDrawArrays(GL_TRIANGLES, 0, Gallina::vertices.size());
+
+		glUseProgram(0);
+		glBindVertexArray(0);
+	}
+
+}
+
+////////////////////////////////////////////////// TRUMP
+namespace Trump {
+
+	std::vector< glm::vec3 > vertices;
+	std::vector< glm::vec2 > uvs;
+	std::vector< glm::vec3 > normals;
+	float lastX;
+	float lastY;
+	float angle;
+	GLuint trumpVao;
+	GLuint trumpVbo[3];
+	GLuint trumpShaders[2];
+	GLuint trumpProgram;
+
+	glm::mat4 trumpMat = glm::mat4(1.f);
+	glm::vec4 trumpColor = { 1.0f, 0.1f, 1.f, 0.f };
+
+	const char* trump_vertShader =
+		"#version 330\n\
+in vec3 in_Position;\n\
+in vec3 in_Normal;\n\
+out vec3 vert_Normal;\n\
+out vec3 fragPos;\n\
+uniform mat4 objMat;\n\
+uniform mat4 mv_Mat;\n\
+uniform mat4 mvpMat;\n\
+void main() {\n\
+	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
+	fragPos = vec3(mv_Mat * objMat * vec4(in_Position, 1.0));\n\
+	vert_Normal = vec3(mv_Mat * objMat * vec4(in_Normal, 0.0));\n\
+}";
+	const char* trump_fragShader =
+		"#version 330\n\
+in vec3 vert_Normal;\n\
+in vec3 fragPos;\n\
+out vec4 out_Color;\n\
+uniform mat4 mv_Mat;\n\
+uniform vec4 Color;\n\
+void main() {\n\
+	out_Color = Color;\n\
+}";
+
+	void setupTrump() {
+		glBufferData(GL_ARRAY_BUFFER, Trump::vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
+
+		glGenVertexArrays(1, &trumpVao);
+		glBindVertexArray(trumpVao);
+		glGenBuffers(2, trumpVbo);
+
+		glBindBuffer(GL_ARRAY_BUFFER, trumpVbo[0]);
+		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, trumpVbo[1]);
+		glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(1);
+
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		trumpShaders[0] = compileShader(trump_vertShader, GL_VERTEX_SHADER, "cubeVert");
+		trumpShaders[1] = compileShader(trump_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
+
+		trumpProgram = glCreateProgram();
+		glAttachShader(trumpProgram, trumpShaders[0]);
+		glAttachShader(trumpProgram, trumpShaders[1]);
+		glBindAttribLocation(trumpProgram, 0, "in_Position");
+		glBindAttribLocation(trumpProgram, 1, "in_Normal");
+		linkProgram(trumpProgram);
+		trumpMat = glm::rotate(trumpMat, (float)glm::radians(-90.0f), glm::vec3(0, 1, 0));
+		trumpMat = glm::translate(trumpMat, glm::vec3(0.2f, 5.8f, -5.7f));	
+		lastX = -5.7f;
+		lastY = 5.8;
+	}
+
+	void cleanupTrump() {
+		glDeleteBuffers(2, trumpVbo);
+		glDeleteVertexArrays(1, &trumpVao);
+
+		glDeleteProgram(trumpProgram);
+		glDeleteShader(trumpShaders[0]);
+		glDeleteShader(trumpShaders[1]);
+	}
+
+	void drawTrump(float currentTime) {
+
+		glBindVertexArray(trumpVao);
+		glUseProgram(trumpProgram);
+
+		glUniformMatrix4fv(glGetUniformLocation(trumpProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(trumpMat));
+		glUniformMatrix4fv(glGetUniformLocation(trumpProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(trumpProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniform4f(glGetUniformLocation(trumpProgram, "Color"), trumpColor[0], trumpColor[1], trumpColor[2], trumpColor[3]);
+		glDrawArrays(GL_TRIANGLES, 0, Trump::vertices.size());
+
+		glUseProgram(0);
+		glBindVertexArray(0);
+
+	}
+
+}
+
+////////////////////////////////////////////////// CABINA
+namespace Cabina {
+	std::vector< glm::vec3 > vertices;
+	std::vector< glm::vec2 > uvs;
+	std::vector< glm::vec3 > normals;
+	float lastX;
+	float lastY;
+	float mainX;
+	float mainY;
+	float angle;
+	GLuint cabinaVao;
+	GLuint cabinaVbo[3];
+	GLuint cabinaShaders[2];
+	GLuint cabinaProgram;
+
+	glm::mat4 cabinaMat = glm::mat4(1.f);
+	glm::vec4 cabinaColor = { 1.0f, 1.f, 0.1f, 0.f };
+
+	const char* cabina_vertShader =
+		"#version 330\n\
+in vec3 in_Position;\n\
+in vec3 in_Normal;\n\
+out vec3 vert_Normal;\n\
+out vec3 fragPos;\n\
+uniform mat4 objMat;\n\
+uniform mat4 mv_Mat;\n\
+uniform mat4 mvpMat;\n\
+void main() {\n\
+	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
+	fragPos = vec3(mv_Mat * objMat * vec4(in_Position, 1.0));\n\
+	vert_Normal = vec3(mv_Mat * objMat * vec4(in_Normal, 0.0));\n\
+}";
+	const char* cabina_fragShader =
+		"#version 330\n\
+in vec3 vert_Normal;\n\
+in vec3 fragPos;\n\
+out vec4 out_Color;\n\
+uniform mat4 mv_Mat;\n\
+uniform vec4 Color;\n\
+void main() {\n\
+	out_Color = Color;\n\
+}";
+
+	void setupCabina() {
+		glBufferData(GL_ARRAY_BUFFER, Cabina::vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
+
+		glGenVertexArrays(1, &cabinaVao);
+		glBindVertexArray(cabinaVao);
+		glGenBuffers(2, cabinaVbo);
+
+		glBindBuffer(GL_ARRAY_BUFFER, cabinaVbo[0]);
+		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, cabinaVbo[1]);
+		glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(1);
+
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		cabinaShaders[0] = compileShader(cabina_vertShader, GL_VERTEX_SHADER, "cubeVert");
+		cabinaShaders[1] = compileShader(cabina_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
+
+		cabinaProgram = glCreateProgram();
+		glAttachShader(cabinaProgram, cabinaShaders[0]);
+		glAttachShader(cabinaProgram, cabinaShaders[1]);
+		glBindAttribLocation(cabinaProgram, 0, "in_Position");
+		glBindAttribLocation(cabinaProgram, 1, "in_Normal");
+		linkProgram(cabinaProgram);
+		cabinaMat = glm::translate(cabinaMat, glm::vec3(5.55f, 6.3f, .0f));
+		lastX = 5.55f;
+		lastY = 6.3f;
+		mainX = lastX;
+		mainY = lastY;
+		angle = 0.0f;
+	}
+
+	void cleanupCabina() {
+		glDeleteBuffers(2, cabinaVbo);
+		glDeleteVertexArrays(1, &cabinaVao);
+
+		glDeleteProgram(cabinaProgram);
+		glDeleteShader(cabinaShaders[0]);
+		glDeleteShader(cabinaShaders[1]);
+	}
+
+	void drawCabina(float currentTime) {
+
+		glBindVertexArray(cabinaVao);
+		glUseProgram(cabinaProgram);
+
+		glUniformMatrix4fv(glGetUniformLocation(cabinaProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(cabinaMat));
+		glUniformMatrix4fv(glGetUniformLocation(cabinaProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(cabinaProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniform4f(glGetUniformLocation(cabinaProgram, "Color"), cabinaColor[0], cabinaColor[1], cabinaColor[2], cabinaColor[3]);
+		glDrawArrays(GL_TRIANGLES, 0, Cabina::vertices.size());
+
+		glUseProgram(0);
+		glBindVertexArray(0);
+	}
+
+}
+
+////////////////////////////////////////////////// RADIOS
+namespace Radios {
+
+	std::vector< glm::vec3 > vertices;
+	std::vector< glm::vec2 > uvs;
+	std::vector< glm::vec3 > normals;
+
+	GLuint radiosVao;
+	GLuint radiosVbo[3];
+	GLuint radiosShaders[2];
+	GLuint radiosProgram;
+
+	glm::mat4 radiosMat = glm::mat4(1.f);
+	glm::vec4 radiosColor = { 0.5f, 0.5f, 0.5f, 0.f };
+
+	const char* radios_vertShader =
+		"#version 330\n\
+in vec3 in_Position;\n\
+in vec3 in_Normal;\n\
+out vec3 vert_Normal;\n\
+out vec3 fragPos;\n\
+uniform mat4 objMat;\n\
+uniform mat4 mv_Mat;\n\
+uniform mat4 mvpMat;\n\
+void main() {\n\
+	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
+	fragPos = vec3(mv_Mat * objMat * vec4(in_Position, 1.0));\n\
+	vert_Normal = vec3(mv_Mat * objMat * vec4(in_Normal, 0.0));\n\
+}";
+	const char* radios_fragShader =
+		"#version 330\n\
+in vec3 vert_Normal;\n\
+in vec3 fragPos;\n\
+out vec4 out_Color;\n\
+uniform mat4 mv_Mat;\n\
+uniform vec4 Color;\n\
+void main() {\n\
+	out_Color = Color;\n\
+}";
+
+	void setupRadios() {
+		glBufferData(GL_ARRAY_BUFFER, Radios::vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
+
+		glGenVertexArrays(1, &radiosVao);
+		glBindVertexArray(radiosVao);
+		glGenBuffers(2, radiosVbo);
+
+		glBindBuffer(GL_ARRAY_BUFFER, radiosVbo[0]);
+		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, radiosVbo[1]);
+		glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(1);
+
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		radiosShaders[0] = compileShader(radios_vertShader, GL_VERTEX_SHADER, "cubeVert");
+		radiosShaders[1] = compileShader(radios_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
+
+		radiosProgram = glCreateProgram();
+		glAttachShader(radiosProgram, radiosShaders[0]);
+		glAttachShader(radiosProgram, radiosShaders[1]);
+		glBindAttribLocation(radiosProgram, 0, "in_Position");
+		glBindAttribLocation(radiosProgram, 1, "in_Normal");
+		linkProgram(radiosProgram);
+		radiosMat = glm::translate(radiosMat, glm::vec3(.0f, 6.3f, .0f));
+	}
+
+	void cleanupRadios() {
+		glDeleteBuffers(2, radiosVbo);
+		glDeleteVertexArrays(1, &radiosVao);
+
+		glDeleteProgram(radiosProgram);
+		glDeleteShader(radiosShaders[0]);
+		glDeleteShader(radiosShaders[1]);
+	}
+
+	void drawRadios(float currentTime) {
+
+		glBindVertexArray(radiosVao);
+		glUseProgram(radiosProgram);
+
+		glUniformMatrix4fv(glGetUniformLocation(radiosProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(radiosMat));
+		glUniformMatrix4fv(glGetUniformLocation(radiosProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(radiosProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniform4f(glGetUniformLocation(radiosProgram, "Color"), radiosColor[0], radiosColor[1], radiosColor[2], radiosColor[3]);
+		glDrawArrays(GL_TRIANGLES, 0, Radios::vertices.size());
+
+		glUseProgram(0);
+		glBindVertexArray(0);
+	}
+
+}
+
+////////////////////////////////////////////////// SOPORTE
+namespace Soporte {
+
+	std::vector< glm::vec3 > vertices;
+	std::vector< glm::vec2 > uvs;
+	std::vector< glm::vec3 > normals;
+
+	GLuint soporteVao;
+	GLuint soporteVbo[3];
+	GLuint soporteShaders[2];
+	GLuint soporteProgram;
+
+	glm::mat4 soporteMat = glm::mat4(1.f);
+	glm::vec4 soporteColor = { 0.5f, 0.5f, 0.5f, 0.f };
+
+	const char* soporte_vertShader =
+		"#version 330\n\
+in vec3 in_Position;\n\
+in vec3 in_Normal;\n\
+out vec3 vert_Normal;\n\
+out vec3 fragPos;\n\
+uniform mat4 objMat;\n\
+uniform mat4 mv_Mat;\n\
+uniform mat4 mvpMat;\n\
+void main() {\n\
+	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
+	fragPos = vec3(mv_Mat * objMat * vec4(in_Position, 1.0));\n\
+	vert_Normal = vec3(mv_Mat * objMat * vec4(in_Normal, 0.0));\n\
+}";
+	const char* soporte_fragShader =
+		"#version 330\n\
+in vec3 vert_Normal;\n\
+in vec3 fragPos;\n\
+out vec4 out_Color;\n\
+uniform mat4 mv_Mat;\n\
+uniform vec4 Color;\n\
+void main() {\n\
+	out_Color = Color;\n\
+}";
+
+	void setupSoporte() {
+		glBufferData(GL_ARRAY_BUFFER, Soporte::vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
+
+		glGenVertexArrays(1, &soporteVao);
+		glBindVertexArray(soporteVao);
+		glGenBuffers(2, soporteVbo);
+
+		glBindBuffer(GL_ARRAY_BUFFER, soporteVbo[0]);
+		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, soporteVbo[1]);
+		glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(1);
+
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		soporteShaders[0] = compileShader(soporte_vertShader, GL_VERTEX_SHADER, "cubeVert");
+		soporteShaders[1] = compileShader(soporte_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
+
+		soporteProgram = glCreateProgram();
+		glAttachShader(soporteProgram, soporteShaders[0]);
+		glAttachShader(soporteProgram, soporteShaders[1]);
+		glBindAttribLocation(soporteProgram, 0, "in_Position");
+		glBindAttribLocation(soporteProgram, 1, "in_Normal");
+		linkProgram(soporteProgram);
+	}
+
+	void cleanupSoporte() {
+		glDeleteBuffers(2, soporteVbo);
+		glDeleteVertexArrays(1, &soporteVao);
+
+		glDeleteProgram(soporteProgram);
+		glDeleteShader(soporteShaders[0]);
+		glDeleteShader(soporteShaders[1]);
+	}
+
+	void drawSoporte(float currentTime) {
+
+		glBindVertexArray(soporteVao);
+		glUseProgram(soporteProgram);
+
+		glUniformMatrix4fv(glGetUniformLocation(soporteProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(soporteMat));
+		glUniformMatrix4fv(glGetUniformLocation(soporteProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(soporteProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniform4f(glGetUniformLocation(soporteProgram, "Color"), soporteColor[0], soporteColor[1], soporteColor[2], soporteColor[3]);
+		glDrawArrays(GL_TRIANGLES, 0, Soporte::vertices.size());
+
+		glUseProgram(0);
+		glBindVertexArray(0);
+	}
+
+}
+
+
+//My first point, and my first triangle:
+
+static const GLchar * vertex_shader_source[] =
+{
+			  "#version 330 \n\
+			  void main() \n\
+			  { \n\
+							const vec4 vertices[3] = vec4[3](\n\
+							vec4(0.25, -0.25, 0.5, 1.0),\n\
+							vec4(0.25, 0.25, 0.5, 1.0),\n\
+							vec4(-0.25, -0.25, 0.5, 1.0)); \n\
+							gl_Position = \n\
+							vertices[gl_VertexID]; \n\
+			  }"
+
+};
+
+
+
+static const GLchar * fragment_shader_source[] =
+
+{
+
+			  "#version 330\n\
+			  \n\
+			  out vec4 color; \n\
+			  \n\
+			  void main() {\n\
+ color = vec4(0.0,0.8,1.0,1.0); \n\
+}"
+};
+
+
+
+GLuint compile_shaders(void)
+
+{
+	GLuint vertex_shader; //direccion de memoria del vertex shader
+	GLuint fragment_shader; //direccion de memoria del fragment shader
+	GLuint program;
+
+
+
+	vertex_shader = glCreateShader(GL_VERTEX_SHADER); //crea shader tipo vertex
+	glShaderSource(vertex_shader, 1, vertex_shader_source, NULL); //Tiene este codigo source
+	glCompileShader(vertex_shader); //compila
+
+
+
+	fragment_shader = glCreateShader(GL_FRAGMENT_SHADER); //mismo porceso que el vertex pero tipo fragment
+	glShaderSource(fragment_shader, 1, fragment_shader_source, NULL);
+
+	glCompileShader(fragment_shader);
+
+
+
+	program = glCreateProgram();
+
+
+
+	glAttachShader(program, vertex_shader);
+
+	glAttachShader(program, fragment_shader);
+
+
+
+	glLinkProgram(program);
+
+
+
+	glDeleteShader(vertex_shader);
+
+	glDeleteShader(fragment_shader);
+
+
+
+	return program;
+
+}
+
+
+GLuint myRenderProgram;
+
+GLuint myVao; //vertex array
+
+
 
 void GLinit(int width, int height) {
-	srand(time(NULL));
+
+	bool res = loadOBJ("Gallina.obj", Gallina::vertices, Gallina::uvs, Gallina::normals);
+	bool res1 = loadOBJ("Trump.obj", Trump::vertices, Trump::uvs, Trump::normals);
+	bool res2 = loadOBJ("Cabina.obj", Cabina::vertices, Cabina::uvs, Cabina::normals);
+	bool res3 = loadOBJ("Radios.obj", Radios::vertices, Radios::uvs, Radios::normals);
+	bool res4 = loadOBJ("Soporte.obj", Soporte::vertices, Soporte::uvs, Soporte::normals);
 	glViewport(0, 0, width, height);
+
 	glClearColor(0.2f, 0.2f, 0.2f, 1.f);
+
 	glClearDepth(1.f);
+
 	glDepthFunc(GL_LEQUAL);
+
 	glEnable(GL_DEPTH_TEST);
+
 	glEnable(GL_CULL_FACE);
+
+
 
 	RV::_projection = glm::perspective(RV::FOV, (float)width / (float)height, RV::zNear, RV::zFar);
 
-	// Setup shaders & geometry
-	Box::setupCube();
-	Axis::setupAxis();
-	if(exercise == 1) TOct::setupTOct();
-	else TOct2::setupTOct2();
-}
-
-void GLcleanup() {
-	Box::cleanupCube();
-	Axis::cleanupAxis();
-	if (exercise == 1) TOct::cleanupTOct();
-	else TOct2::cleanupTOct2();
-}
-
-
-
-void GLrender(float dt) {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	RV::_modelView = glm::mat4(1.f);
 	RV::_modelView = glm::translate(RV::_modelView, glm::vec3(RV::panv[0], RV::panv[1], RV::panv[2]));
 	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
 	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));
-
 	RV::_MVP = RV::_projection * RV::_modelView;
+	//començar a contar
 
-	currentTime += dt;
+	// Setup shaders & geometry
 
-	Box::drawCube();
-	Axis::drawAxis();
-	if (exercise == 1 && lastExercise == 2) TOct::setupTOct();
-	else if (exercise == 2 && lastExercise == 1) TOct2::setupTOct2();
-	else if (exercise == 1) TOct::drawTOct(dt);
-	else if (exercise == 2) TOct2::drawTOct2(dt);
+	Axis::setupAxis();
+
+	Cube::setupCube();
+
+	Gallina::setupGallina();
+
+	Trump::setupTrump();
 	
-	lastExercise = exercise;
+	Cabina::setupCabina();
+
+	Radios::setupRadios();
+
+	Soporte::setupSoporte();
+
+	/////////////////////////////////////////////////////TODO
+
+	// Do your init code here
+
+	// ...
+
+	// ...
+
+	// ...
+
+	/////////////////////////////////////////////////////////
+
+	glGenVertexArrays(1, &myVao);
+
+	myRenderProgram = compile_shaders();
+
+}
+
+
+
+void GLcleanup() {
+
+	Axis::cleanupAxis();
+
+	Cube::cleanupCube();
+
+	Gallina::cleanupGallina();
+
+	Trump::cleanupTrump();
+
+	Cabina::cleanupCabina();
+
+	Radios::cleanupRadios();
+
+	Soporte::cleanupSoporte();
+
+	/////////////////////////////////////////////////////TODO
+
+	// Do your cleanup code here
+
+	// ...
+
+	// ...
+
+	// ...
+
+	/////////////////////////////////////////////////////////
+
+}
+
+float currentTime = 0;
+
+void GLrender(float dt) {
+
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	//RV::_modelView = glm::mat4(1.f);
+	if (/*han passat els dos segons &&*/ !RV::lookingTrump)
+	{
+		//començar a contar
+	}
+	else if (/*han passat els dos segons*/1 == 1)
+	{
+		//començar a contar
+	}
+	RV::_modelView = glm::translate(RV::_modelView, glm::vec3(ImGui::PosX - RV::panv[0], ImGui::PosY - RV::panv[1], ImGui::PosZ - RV::panv[2]));
+	RV::panv[0] = ImGui::PosX;
+	RV::panv[1] = ImGui::PosY;
+	RV::panv[2] = ImGui::PosZ;
+	/*RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
+	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));*/
+	RV::_MVP = RV::_projection * RV::_modelView;
+	//look at gallina
+
+	Axis::drawAxis();
+
+	/////////////////////////////////////////////////////TODO
+
+	// Do your render code here
+
+	// ...
+
+
+	 ///////////////////////////////////////////////////////////////////////////CUBS
+
+	//Cube::drawCube();
+
+	// ...
+
+	// ...
+
+	/////////////////////////////////////////////////////////
+
+	Cabina::mainX = Cabina::lastX;
+	Cabina::mainY = Cabina::lastY;
+
+	Gallina::gallinaMat = glm::translate(Gallina::gallinaMat, glm::vec3(0.0f, ((sin(glm::radians(Gallina::angle)) * 5.55) + 5.8) - Gallina::lastY, ((cos(glm::radians(Gallina::angle)) * 5.55) - 0.15) - Gallina::lastX));
+	Gallina::lastX = (cos(glm::radians(Gallina::angle)) * 5.55) - 0.15;
+	Gallina::lastY = (sin(glm::radians(Gallina::angle)) * 5.55) + 5.8;
+	Gallina::drawGallina(currentTime);
+
+	Trump::trumpMat = glm::translate(Trump::trumpMat, glm::vec3(0.0f, ((sin(glm::radians(Trump::angle)) * 5.55) + 5.8) - Trump::lastY, -((cos(glm::radians(Trump::angle)) * 5.55) + 0.15) - Trump::lastX));
+	Trump::lastX = -((cos(glm::radians(Trump::angle)) * 5.55) + 0.15);
+	Trump::lastY = (sin(glm::radians(Trump::angle)) * 5.55) + 5.8;
+	Trump::drawTrump(currentTime);
+
+	for (int i = 0; i < 20; i++)
+	{
+		Cabina::cabinaMat = glm::translate(Cabina::cabinaMat, glm::vec3((cos(glm::radians(Cabina::angle)) * 5.55) - Cabina::lastX, ((sin(glm::radians(Cabina::angle)) * 5.55) + 6.3) - Cabina::lastY, .0f));
+		Cabina::drawCabina(currentTime);
+		Cabina::lastX = (cos(glm::radians(Cabina::angle)) * 5.55);
+		Cabina::lastY = (sin(glm::radians(Cabina::angle)) * 5.55) + 6.3;
+		Cabina::angle += 18;
+		if (Cabina::angle >= 360) Cabina::angle -= 360;
+	}
+
+	//Cabina::drawCabina(currentTime);
+
+	Radios::radiosMat = glm::rotate(Radios::radiosMat, (float)glm::radians(ImGui::Velocity), glm::vec3(0, 0, 1));
+	Radios::drawRadios(currentTime);
+	Gallina::angle += ImGui::Velocity;
+	Trump::angle += ImGui::Velocity;
+	Cabina::angle += ImGui::Velocity;
+
+
+	Soporte::drawSoporte(currentTime);
+
+	//EX1:
+	//glPointSize(40.0f);
+
+	glBindVertexArray(myVao);
+	glUseProgram(myRenderProgram);
+
+	//EX1:
+	//glDrawArrays(GL_POINTS, 0, 1);
+
+	//EX2:
+	//glDrawArrays(GL_TRIANGLES, 0, 3);
+
+
 
 	ImGui::Render();
+
 }
 
 void GUI() {
@@ -1562,13 +1295,26 @@ void GUI() {
 
 	{
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-		if(exercise == 1)ImGui::DragFloat("Velocity", &TOct::velocity, 0.02f, 0.0f, 5.0f);
-		if (ImGui::Button("Switch exercise"))
-		{
-			if(exercise == 1) exercise = 2;
-			else if (exercise == 2) exercise = 1;
-		}
+
+		/////////////////////////////////////////////////////TODO
+		// Do your GUI code here....
+		// ...
+		// ...
+		// ...
+		/////////////////////////////////////////////////////////
+		ImGui::DragFloat("Velocity", &ImGui::Velocity, 0.01f, 0.0f, 0.5f);
+		ImGui::DragFloat("POS_X", &ImGui::PosX, 0.02f, -10.0f, 10.0f);
+		ImGui::DragFloat("POS_Y", &ImGui::PosY, 0.02f, -12.0f, 0.0f);
+		ImGui::DragFloat("POS_Z", &ImGui::PosZ, 0.02f, -10.0f, 10.0f);
+		ImGui::DragFloat("Diffuse", &ImGui::Diffuse, 0.02f, 0.0f, 1.0f);
+		ImGui::DragFloat("Specular", &ImGui::Specular, 0.02f, 0.0f, 1.0f);
+		ImGui::DragFloat("Ambient", &ImGui::Ambient, 0.02f, 0.0, 1.0f);
+		ImGui::DragFloat("Light Power", &ImGui::LightPower, 0.02f, 0.0f, 1.0f);
+		ImGui::DragFloat("Light X", &ImGui::lightPosition[0], 0.02f, -10.0f, 10.0f);
+		ImGui::DragFloat("Light Y", &ImGui::lightPosition[1], 0.02f, -10.0f, 10.0f);
+		ImGui::DragFloat("Light Z", &ImGui::lightPosition[2], 0.02f, -10.0f, 10.0f);
 	}
+	// .........................
 
 	ImGui::End();
 
