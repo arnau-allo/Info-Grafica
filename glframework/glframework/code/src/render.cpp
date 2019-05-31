@@ -3,6 +3,9 @@
 #include <vector>
 #include <ctime>
 #include <time.h>
+#include <fstream>
+#include <string>
+#include <sstream>
 
 #include <GL\glew.h>
 #include <glm\gtc\type_ptr.hpp>
@@ -20,9 +23,10 @@
 ///////// fw decl
 namespace ImGui {
 	glm::vec3 lightPosition = { 10.f, 10.0f, 10.0f };
-	glm::vec3 lightColor = { 1.f, 1.f, 1.f };
+	glm::vec3 lightColor = { 0.3f, 0.04f, 0.12f };
 	float Velocity = 0.1;
 	float Diffuse, Specular, Ambient, LightPower;
+	int exercise1, exercise2;
     void Render();
 }
 namespace Axis {
@@ -39,7 +43,7 @@ namespace RenderVars {
 	const float zFar = 50.f;
 
 	bool lookingTrump = false;
-	bool firstTime;
+	bool firstTime, secondTime, init;
 	double start;
 
 	glm::mat4 _projection;
@@ -93,7 +97,21 @@ void GLmousecb(MouseEvent ev) {
 }
 
 //////////////////////////////////////////////////
-GLuint compileShader(const char* shaderStr, GLenum shaderType, const char* name = "") {
+GLuint compileShader(GLenum shaderType, std::string shaderName, const char* name = "") {
+
+	std::stringstream stream;
+	std::string string;
+
+	std::ifstream myFile(shaderName);
+	if (myFile.is_open())
+	{
+		stream << myFile.rdbuf();
+		myFile.close();
+		string = stream.str();
+	}
+
+	const GLchar * shaderStr = string.c_str();
+
 	GLuint shader = glCreateShader(shaderType);
 	glShaderSource(shader, 1, &shaderStr, NULL);
 	glCompileShader(shader);
@@ -151,23 +169,8 @@ namespace Axis {
 		2, 3,
 		4, 5
 	};
-	const char* Axis_vertShader =
-		"#version 330\n\
-in vec3 in_Position;\n\
-in vec4 in_Color;\n\
-out vec4 vert_color;\n\
-uniform mat4 mvpMat;\n\
-void main() {\n\
-	vert_color = in_Color;\n\
-	gl_Position = mvpMat * vec4(in_Position, 1.0);\n\
-}";
-	const char* Axis_fragShader =
-		"#version 330\n\
-in vec4 vert_color;\n\
-out vec4 out_Color;\n\
-void main() {\n\
-	out_Color = vert_color;\n\
-}";
+	const char* Axis_vertShader;
+	const char* Axis_fragShader;
 
 	void setupAxis() {
 		glGenVertexArrays(1, &AxisVao);
@@ -191,8 +194,8 @@ void main() {\n\
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-		AxisShader[0] = compileShader(Axis_vertShader, GL_VERTEX_SHADER, "AxisVert");
-		AxisShader[1] = compileShader(Axis_fragShader, GL_FRAGMENT_SHADER, "AxisFrag");
+		AxisShader[0] = compileShader(GL_VERTEX_SHADER, "BasicVert.txt", "AxisVert");
+		AxisShader[1] = compileShader(GL_FRAGMENT_SHADER, "BasicFrag.txt", "AxisFrag");
 
 		AxisProgram = glCreateProgram();
 		glAttachShader(AxisProgram, AxisShader[0]);
@@ -220,232 +223,41 @@ void main() {\n\
 	}
 }
 
-////////////////////////////////////////////////// CUBE
-namespace Cube {
-	GLuint cubeVao;
-	GLuint cubeVbo[3];
-	GLuint cubeShaders[2];
-	GLuint cubeProgram;
-	glm::mat4 objMat = glm::mat4(1.f);
-	glm::vec3 objColor = { 0.1f, 1.f, 1.f};
 
-	extern const float halfW = 0.5f;
-	int numVerts = 24 + 6; // 4 vertex/face * 6 faces + 6 PRIMITIVE RESTART
-
-						   //   4---------7
-						   //  /|        /|
-						   // / |       / |
-						   //5---------6  |
-						   //|  0------|--3
-						   //| /       | /
-						   //|/        |/
-						   //1---------2
-	glm::vec3 verts[] = {
-		glm::vec3(-halfW, -halfW, -halfW),
-		glm::vec3(-halfW, -halfW,  halfW),
-		glm::vec3(halfW, -halfW,  halfW),
-		glm::vec3(halfW, -halfW, -halfW),
-		glm::vec3(-halfW,  halfW, -halfW),
-		glm::vec3(-halfW,  halfW,  halfW),
-		glm::vec3(halfW,  halfW,  halfW),
-		glm::vec3(halfW,  halfW, -halfW)
-	};
-	glm::vec3 norms[] = {
-		glm::vec3(0.f, -1.f,  0.f),
-		glm::vec3(0.f,  1.f,  0.f),
-		glm::vec3(-1.f,  0.f,  0.f),
-		glm::vec3(1.f,  0.f,  0.f),
-		glm::vec3(0.f,  0.f, -1.f),
-		glm::vec3(0.f,  0.f,  1.f)
-	};
-
-	glm::vec3 cubeVerts[] = {
-		verts[1], verts[0], verts[2], verts[3],
-		verts[5], verts[6], verts[4], verts[7],
-		verts[1], verts[5], verts[0], verts[4],
-		verts[2], verts[3], verts[6], verts[7],
-		verts[0], verts[4], verts[3], verts[7],
-		verts[1], verts[2], verts[5], verts[6]
-	};
-	glm::vec3 cubeNorms[] = {
-		norms[0], norms[0], norms[0], norms[0],
-		norms[1], norms[1], norms[1], norms[1],
-		norms[2], norms[2], norms[2], norms[2],
-		norms[3], norms[3], norms[3], norms[3],
-		norms[4], norms[4], norms[4], norms[4],
-		norms[5], norms[5], norms[5], norms[5]
-	};
-	GLubyte cubeIdx[] = {
-		0, 1, 2, 3, UCHAR_MAX,
-		4, 5, 6, 7, UCHAR_MAX,
-		8, 9, 10, 11, UCHAR_MAX,
-		12, 13, 14, 15, UCHAR_MAX,
-		16, 17, 18, 19, UCHAR_MAX,
-		20, 21, 22, 23, UCHAR_MAX
-	};
-
-	const char* cube_vertShader =
-		"#version 330\n\
-in vec3 in_Position;\n\
-in vec3 in_Normal;\n\
-out vec4 vert_Normal;\n\
-uniform mat4 objMat;\n\
-uniform mat4 mv_Mat;\n\
-uniform mat4 mvpMat;\n\
-void main() {\n\
-	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
-	vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
-}";
-	const char* cube_fragShader =
-		"#version 330\n\
-in vec4 vert_Normal;\n\
-out vec4 out_Color;\n\
-uniform mat4 mv_Mat;\n\
-uniform vec4 color;\n\
-void main() {\n\
-	out_Color = vec4(color.xyz * dot(vert_Normal, mv_Mat*vec4(0.0, 1.0, 0.0, 0.0)) + color.xyz * 0.3, 1.0 );\n\
-}";
-
-	void setupCube() {
-		glGenVertexArrays(1, &cubeVao);
-		glBindVertexArray(cubeVao);
-		glGenBuffers(3, cubeVbo);
-
-		glBindBuffer(GL_ARRAY_BUFFER, cubeVbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVerts), cubeVerts, GL_STATIC_DRAW);
-		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(0);
-
-		glBindBuffer(GL_ARRAY_BUFFER, cubeVbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(cubeNorms), cubeNorms, GL_STATIC_DRAW);
-		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(1);
-
-		glPrimitiveRestartIndex(UCHAR_MAX);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeVbo[2]);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIdx), cubeIdx, GL_STATIC_DRAW);
-
-		glBindVertexArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-		cubeShaders[0] = compileShader(cube_vertShader, GL_VERTEX_SHADER, "cubeVert");
-		cubeShaders[1] = compileShader(cube_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
-
-		cubeProgram = glCreateProgram();
-		glAttachShader(cubeProgram, cubeShaders[0]);
-		glAttachShader(cubeProgram, cubeShaders[1]);
-		glBindAttribLocation(cubeProgram, 0, "in_Position");
-		glBindAttribLocation(cubeProgram, 1, "in_Normal");
-		linkProgram(cubeProgram);
-		objMat = glm::translate(objMat, glm::vec3(0.0f, 5.0f, 0.0f));
-	}
-	void cleanupCube() {
-		glDeleteBuffers(3, cubeVbo);
-		glDeleteVertexArrays(1, &cubeVao);
-
-		glDeleteProgram(cubeProgram);
-		glDeleteShader(cubeShaders[0]);
-		glDeleteShader(cubeShaders[1]);
-	}
-	void updateCube(const glm::mat4& transform) {
-		objMat = transform;
-	}
-	void drawCube() {
-		glEnable(GL_PRIMITIVE_RESTART);
-		glBindVertexArray(cubeVao);
-		glUseProgram(cubeProgram);
-
-		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
-
-		glUseProgram(0);
-		glBindVertexArray(0);
-		glDisable(GL_PRIMITIVE_RESTART);
-	}
-}
-
-
-namespace Object {
+namespace Luz {
 
 	std::vector< glm::vec3 > vertices;
 	std::vector< glm::vec2 > uvs;
 	std::vector< glm::vec3 > normals;
+	glm::vec3 position;
+	glm::vec4 lightColor = { 1.f, 1.f, 0.f, 0.f };
+	float angle;
+	float rotationX;
+	bool goingRight;
+	GLuint luzVao;
+	GLuint luzVbo[3];
+	GLuint luzShaders[2];
+	GLuint luzProgram;
 
-	GLuint objectVao;
-	GLuint objectVbo[3];
-	GLuint objectShaders[2];
-	GLuint objectProgram;
+	glm::mat4 luzMat = glm::mat4(1.f);
+	glm::vec4 luzColor = { 1.f, 1.f, 0.f, 0.f };
 
-	glm::mat4 objMat = glm::mat4(1.f);
-	glm::vec4 objColor = { 0.1f, 1.f, 1.f, 0.f };
+	char* luz_vertShader;
+	char* luz_fragShader;
 
-	const char* object_vertShader =
-		"#version 330\n\
-in vec3 in_Position;\n\
-in vec3 in_Normal;\n\
-out vec3 vert_Normal;\n\
-out vec3 fragPos;\n\
-out vec3 vec_light;\n\
-uniform mat4 objMat;\n\
-uniform mat4 mv_Mat;\n\
-uniform mat4 mvpMat;\n\
-uniform vec3 light_Position;\n\
-void main() {\n\
-	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
-	fragPos = vec3(mv_Mat * objMat * vec4(in_Position, 1.0));\n\
-	vert_Normal = vec3(mv_Mat * objMat * vec4(in_Normal, 0.0));\n\
-	vec_light = vec3(mv_Mat * objMat * vec4(light_Position, 0.0));\n\
-}";
+	void setupLuz() {
+		glBufferData(GL_ARRAY_BUFFER, Luz::vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
 
-	const char* object_fragShader =
-		"#version 330\n\
-in vec3 vert_Normal;\n\
-in vec3 fragPos;\n\
-in vec3 vec_light;\n\
-vec3 e;\n\
-vec3 ambient_light;\n\
-vec3 diffuse_color;\n\
-vec3 specular_light;\n\
-out vec4 out_Color;\n\
-uniform mat4 mv_Mat;\n\
-uniform vec3 color;\n\
-uniform vec3 light_Color;\n\
-uniform float kd;\n\
-uniform float ka;\n\
-uniform float ks;\n\
-uniform float light_Power;\n\
-float cosTheta;\n\
-float cosAlpha;\n\
-float distance;\n\
-vec3 r;\n\
-uniform vec3 camera_Point;\n\
-void main() {\n\
-	ambient_light = ka * color.xyz;\n\
-	cosTheta = (clamp(dot(normalize(vert_Normal), normalize(vec_light)), 0, 1));\n\
-	diffuse_color =  kd * (color.xyz * light_Color * light_Power * cosTheta);\n\
-	r = reflect(-vec_light, vert_Normal);\n\
-	e = normalize(-fragPos);\n\
-	cosAlpha = dot(e, r);\n\
-	specular_light = ks * color.xyz * light_Color *  pow(max(cosAlpha, 0.0), 0.2f);\n\
-	out_Color = vec4(ambient_light + diffuse_color + specular_light, 0);\n\
-}";
+		glGenVertexArrays(1, &luzVao);
+		glBindVertexArray(luzVao);
+		glGenBuffers(2, luzVbo);
 
-	void setupObject() {
-		glBufferData(GL_ARRAY_BUFFER, Object::vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
-
-		glGenVertexArrays(1, &objectVao);
-		glBindVertexArray(objectVao);
-		glGenBuffers(2, objectVbo);
-
-		glBindBuffer(GL_ARRAY_BUFFER, objectVbo[0]);
+		glBindBuffer(GL_ARRAY_BUFFER, luzVbo[0]);
 		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(0);
 
-		glBindBuffer(GL_ARRAY_BUFFER, objectVbo[1]);
+		glBindBuffer(GL_ARRAY_BUFFER, luzVbo[1]);
 		glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(1);
@@ -454,44 +266,46 @@ void main() {\n\
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-		objectShaders[0] = compileShader(object_vertShader, GL_VERTEX_SHADER, "cubeVert");
-		objectShaders[1] = compileShader(object_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
+		luzShaders[0] = compileShader(GL_VERTEX_SHADER, "BasicVert.txt", "cubeVert");
+		luzShaders[1] = compileShader( GL_FRAGMENT_SHADER,"BasicFrag.txt", "cubeFrag");
 
-		objectProgram = glCreateProgram();
-		glAttachShader(objectProgram, objectShaders[0]);
-		glAttachShader(objectProgram, objectShaders[1]);
-		glBindAttribLocation(objectProgram, 0, "in_Position");
-		glBindAttribLocation(objectProgram, 1, "in_Normal");
-		linkProgram(objectProgram);
-
+		luzProgram = glCreateProgram();
+		glAttachShader(luzProgram, luzShaders[0]);
+		glAttachShader(luzProgram, luzShaders[1]);
+		glBindAttribLocation(luzProgram, 0, "in_Position");
+		glBindAttribLocation(luzProgram, 1, "in_Normal");
+		linkProgram(luzProgram);
+		if (RV::init)
+		{
+			luzMat = glm::translate(luzMat, glm::vec3(5.55f, 6.3f, .0f));
+			position.x = 5.55f;
+			position.y = 6.3f;
+			position.z = 0.0f;
+			angle = 0.0f;
+			rotationX = 0.0f;
+			goingRight = true;
+		}
 	}
 
-	void cleanupObject() {
-		glDeleteBuffers(2, objectVbo);
-		glDeleteVertexArrays(1, &objectVao);
+	void cleanupLuz() {
+		glDeleteBuffers(2, luzVbo);
+		glDeleteVertexArrays(1, &luzVao);
 
-		glDeleteProgram(objectProgram);
-		glDeleteShader(objectShaders[0]);
-		glDeleteShader(objectShaders[1]);
+		glDeleteProgram(luzProgram);
+		glDeleteShader(luzShaders[0]);
+		glDeleteShader(luzShaders[1]);
 	}
 
-	void drawObject(float currentTime) {
+	void drawLuz(float currentTime) {
 
-		glBindVertexArray(objectVao);
-		glUseProgram(objectProgram);
+		glBindVertexArray(luzVao);
+		glUseProgram(luzProgram);
 
-		glUniformMatrix4fv(glGetUniformLocation(objectProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(objectProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(objectProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		glUniform3f(glGetUniformLocation(objectProgram, "light_Position"), ImGui::lightPosition[0], ImGui::lightPosition[1], ImGui::lightPosition[2]);
-		glUniform3f(glGetUniformLocation(objectProgram, "color"), objColor[0], objColor[1], objColor[2]);
-		glUniform3f(glGetUniformLocation(objectProgram, "light_Color"), ImGui::lightColor[0], ImGui::lightColor[1], ImGui::lightColor[2]);
-		glUniformMatrix4fv(glGetUniformLocation(objectProgram, "camera_Point"), 1, GL_FALSE, glm::value_ptr(RenderVars::_cameraPoint));
-		glUniform1f(glGetUniformLocation(objectProgram, "kd"), ImGui::Diffuse);
-		glUniform1f(glGetUniformLocation(objectProgram, "ka"), ImGui::Ambient);
-		glUniform1f(glGetUniformLocation(objectProgram, "ks"), ImGui::Specular);
-		glUniform1f(glGetUniformLocation(objectProgram, "light_Power"), ImGui::LightPower);
-		glDrawArrays(GL_TRIANGLES, 0, Object::vertices.size());
+		glUniformMatrix4fv(glGetUniformLocation(luzProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(luzMat));
+		glUniformMatrix4fv(glGetUniformLocation(luzProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(luzProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniform3f(glGetUniformLocation(luzProgram, "color"), luzColor[0], luzColor[1], luzColor[2]);
+		glDrawArrays(GL_TRIANGLES, 0, Luz::vertices.size());
 
 		glUseProgram(0);
 		glBindVertexArray(0);
@@ -499,7 +313,6 @@ void main() {\n\
 	}
 
 }
-
 
 
 ////////////////////////////////////////////////// GALLINA
@@ -519,30 +332,8 @@ namespace Gallina {
 	glm::mat4 gallinaMat = glm::mat4(1.f);
 	glm::vec4 gallinaColor = { 0.1f, 1.f, 1.f, 0.f };
 
-	const char* gallina_vertShader =
-		"#version 330\n\
-in vec3 in_Position;\n\
-in vec3 in_Normal;\n\
-out vec3 vert_Normal;\n\
-out vec3 fragPos;\n\
-uniform mat4 objMat;\n\
-uniform mat4 mv_Mat;\n\
-uniform mat4 mvpMat;\n\
-void main() {\n\
-	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
-	fragPos = vec3(mv_Mat * objMat * vec4(in_Position, 1.0));\n\
-	vert_Normal = vec3(mv_Mat * objMat * vec4(in_Normal, 0.0));\n\
-}";
-	const char* gallina_fragShader =
-		"#version 330\n\
-in vec3 vert_Normal;\n\
-in vec3 fragPos;\n\
-out vec4 out_Color;\n\
-uniform mat4 mv_Mat;\n\
-uniform vec4 Color;\n\
-void main() {\n\
-	out_Color = Color;\n\
-}";
+	char* gallina_vertShader;
+	char* gallina_fragShader;
 
 	void setupGallina() {
 		glBufferData(GL_ARRAY_BUFFER, Gallina::vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
@@ -564,9 +355,17 @@ void main() {\n\
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-		gallinaShaders[0] = compileShader(gallina_vertShader, GL_VERTEX_SHADER, "cubeVert");
-		gallinaShaders[1] = compileShader(gallina_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
+		if (ImGui::exercise1 == 1)
+		{
+			gallinaShaders[0] = compileShader(GL_VERTEX_SHADER, "BasicVert.txt", "cubeVert");
+			gallinaShaders[1] = compileShader(GL_FRAGMENT_SHADER, "BasicFrag.txt", "cubeFrag");
+		}
+		else if (ImGui::exercise2 == 1)
+		{
+			gallinaShaders[0] = compileShader(GL_VERTEX_SHADER, "GallinaVert.txt", "cubeVert");
+			gallinaShaders[1] = compileShader(GL_FRAGMENT_SHADER, "GallinaFrag.txt", "cubeFrag");
+		}
+		
 
 		gallinaProgram = glCreateProgram();
 		glAttachShader(gallinaProgram, gallinaShaders[0]);
@@ -574,12 +373,14 @@ void main() {\n\
 		glBindAttribLocation(gallinaProgram, 0, "in_Position");
 		glBindAttribLocation(gallinaProgram, 1, "in_Normal");
 		linkProgram(gallinaProgram);
-
-		gallinaMat = glm::rotate(gallinaMat, (float)glm::radians(90.0f), glm::vec3(0, 1, 0));
-		gallinaMat = glm::translate(gallinaMat, glm::vec3(-0.2f, 5.8f, 5.4f));//-0.15, 11.35
-		lastX = 5.4f;
-		lastY = 5.8;
-		angle = 0.0f;
+		if (RV::init)
+		{
+			gallinaMat = glm::rotate(gallinaMat, (float)glm::radians(90.0f), glm::vec3(0, 1, 0));
+			gallinaMat = glm::translate(gallinaMat, glm::vec3(-0.2f, 5.8f, 5.4f));//-0.15, 11.35
+			lastX = 5.4f;
+			lastY = 5.8;
+			angle = 0.0f;
+		}
 	}
 
 	void cleanupGallina() {
@@ -599,7 +400,17 @@ void main() {\n\
 		glUniformMatrix4fv(glGetUniformLocation(gallinaProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(gallinaMat));
 		glUniformMatrix4fv(glGetUniformLocation(gallinaProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(gallinaProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		glUniform4f(glGetUniformLocation(gallinaProgram, "Color"), gallinaColor[0], gallinaColor[1], gallinaColor[2], gallinaColor[3]);
+		glUniform3f(glGetUniformLocation(gallinaProgram, "light_Position"), ImGui::lightPosition[0], ImGui::lightPosition[1], ImGui::lightPosition[2]);
+		glUniform3f(glGetUniformLocation(gallinaProgram, "light_Position2"), Luz::position[0] + Luz::rotationX/100, Luz::position[1], Luz::position[2]);
+		glUniform3f(glGetUniformLocation(gallinaProgram, "color"), gallinaColor[0], gallinaColor[1], gallinaColor[2]);
+		glUniform3f(glGetUniformLocation(gallinaProgram, "light_Color"), ImGui::lightColor[0], ImGui::lightColor[1], ImGui::lightColor[2]);
+		glUniform3f(glGetUniformLocation(gallinaProgram, "light_Color2"), Luz::lightColor[0], Luz::lightColor[1], Luz::lightColor[2]);
+		glUniformMatrix4fv(glGetUniformLocation(gallinaProgram, "camera_Point"), 1, GL_FALSE, glm::value_ptr(RenderVars::_cameraPoint));
+		glUniform1f(glGetUniformLocation(gallinaProgram, "kd"), ImGui::Diffuse);
+		glUniform1f(glGetUniformLocation(gallinaProgram, "ka"), ImGui::Ambient);
+		glUniform1f(glGetUniformLocation(gallinaProgram, "ks"), ImGui::Specular);
+		glUniform1f(glGetUniformLocation(gallinaProgram, "light_Power"), ImGui::LightPower);
+		//glUniform4f(glGetUniformLocation(gallinaProgram, "Color"), gallinaColor[0], gallinaColor[1], gallinaColor[2], gallinaColor[3]);
 		glDrawArrays(GL_TRIANGLES, 0, Gallina::vertices.size());
 
 		glUseProgram(0);
@@ -623,32 +434,10 @@ namespace Trump {
 	GLuint trumpProgram;
 
 	glm::mat4 trumpMat = glm::mat4(1.f);
-	glm::vec4 trumpColor = { 1.0f, 0.1f, 1.f, 0.f };
+	glm::vec4 trumpColor = { 1.0f, 0.f, 0.f, 0.f };
 
-	const char* trump_vertShader =
-		"#version 330\n\
-in vec3 in_Position;\n\
-in vec3 in_Normal;\n\
-out vec3 vert_Normal;\n\
-out vec3 fragPos;\n\
-uniform mat4 objMat;\n\
-uniform mat4 mv_Mat;\n\
-uniform mat4 mvpMat;\n\
-void main() {\n\
-	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
-	fragPos = vec3(mv_Mat * objMat * vec4(in_Position, 1.0));\n\
-	vert_Normal = vec3(mv_Mat * objMat * vec4(in_Normal, 0.0));\n\
-}";
-	const char* trump_fragShader =
-		"#version 330\n\
-in vec3 vert_Normal;\n\
-in vec3 fragPos;\n\
-out vec4 out_Color;\n\
-uniform mat4 mv_Mat;\n\
-uniform vec4 Color;\n\
-void main() {\n\
-	out_Color = Color;\n\
-}";
+	char* trump_vertShader;
+	char* trump_fragShader;
 
 	void setupTrump() {
 		glBufferData(GL_ARRAY_BUFFER, Trump::vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
@@ -671,8 +460,16 @@ void main() {\n\
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-		trumpShaders[0] = compileShader(trump_vertShader, GL_VERTEX_SHADER, "cubeVert");
-		trumpShaders[1] = compileShader(trump_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
+		if (ImGui::exercise1 == 1)
+		{
+			trumpShaders[0] = compileShader(GL_VERTEX_SHADER, "BasicVert.txt", "cubeVert");
+			trumpShaders[1] = compileShader(GL_FRAGMENT_SHADER, "BasicFrag.txt", "cubeFrag");
+		}
+		else if (ImGui::exercise2 == 1)
+		{
+			trumpShaders[0] = compileShader(GL_VERTEX_SHADER, "TrumpVert.txt", "cubeVert");
+			trumpShaders[1] = compileShader(GL_FRAGMENT_SHADER, "TrumpFrag.txt", "cubeFrag");
+		}
 
 		trumpProgram = glCreateProgram();
 		glAttachShader(trumpProgram, trumpShaders[0]);
@@ -680,10 +477,13 @@ void main() {\n\
 		glBindAttribLocation(trumpProgram, 0, "in_Position");
 		glBindAttribLocation(trumpProgram, 1, "in_Normal");
 		linkProgram(trumpProgram);
-		trumpMat = glm::rotate(trumpMat, (float)glm::radians(180.0f), glm::vec3(0, 1, 0));
-		trumpMat = glm::translate(trumpMat, glm::vec3(-5.7f, 5.8f, -0.2f));
-		lastX = -5.7f;
-		lastY = 5.8;
+		if (RV::init)
+		{
+			trumpMat = glm::rotate(trumpMat, (float)glm::radians(180.0f), glm::vec3(0, 1, 0));
+			trumpMat = glm::translate(trumpMat, glm::vec3(-5.7f, 5.8f, -0.2f));
+			lastX = -5.7f;
+			lastY = 5.8;
+		}
 	}
 
 	void cleanupTrump() {
@@ -703,7 +503,17 @@ void main() {\n\
 		glUniformMatrix4fv(glGetUniformLocation(trumpProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(trumpMat));
 		glUniformMatrix4fv(glGetUniformLocation(trumpProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(trumpProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		glUniform4f(glGetUniformLocation(trumpProgram, "Color"), trumpColor[0], trumpColor[1], trumpColor[2], trumpColor[3]);
+		glUniform3f(glGetUniformLocation(trumpProgram, "light_Position"), ImGui::lightPosition[0], ImGui::lightPosition[1], ImGui::lightPosition[2]);
+		glUniform3f(glGetUniformLocation(trumpProgram, "light_Position2"), Luz::position[0] + Luz::rotationX / 100, Luz::position[1], Luz::position[2]);
+		glUniform3f(glGetUniformLocation(trumpProgram, "light_Position2"), Luz::position[0], Luz::position[1], Luz::position[2]);
+		glUniform3f(glGetUniformLocation(trumpProgram, "color"), trumpColor[0], trumpColor[1], trumpColor[2]);
+		glUniform3f(glGetUniformLocation(trumpProgram, "light_Color"), ImGui::lightColor[0], ImGui::lightColor[1], ImGui::lightColor[2]);
+		glUniform3f(glGetUniformLocation(trumpProgram, "light_Color2"), Luz::lightColor[0], Luz::lightColor[1], Luz::lightColor[2]);
+		glUniformMatrix4fv(glGetUniformLocation(trumpProgram, "camera_Point"), 1, GL_FALSE, glm::value_ptr(RenderVars::_cameraPoint));
+		glUniform1f(glGetUniformLocation(trumpProgram, "kd"), ImGui::Diffuse);
+		glUniform1f(glGetUniformLocation(trumpProgram, "ka"), ImGui::Ambient);
+		glUniform1f(glGetUniformLocation(trumpProgram, "ks"), ImGui::Specular);
+		glUniform1f(glGetUniformLocation(trumpProgram, "light_Power"), ImGui::LightPower);
 		glDrawArrays(GL_TRIANGLES, 0, Trump::vertices.size());
 
 		glUseProgram(0);
@@ -729,32 +539,10 @@ namespace Cabina {
 	GLuint cabinaProgram;
 
 	glm::mat4 cabinaMat = glm::mat4(1.f);
-	glm::vec4 cabinaColor = { 1.0f, 1.f, 0.1f, 0.f };
+	glm::vec4 cabinaColor = { 0.0f, 1.f, 0.1f, 0.f };
 
-	const char* cabina_vertShader =
-		"#version 330\n\
-in vec3 in_Position;\n\
-in vec3 in_Normal;\n\
-out vec3 vert_Normal;\n\
-out vec3 fragPos;\n\
-uniform mat4 objMat;\n\
-uniform mat4 mv_Mat;\n\
-uniform mat4 mvpMat;\n\
-void main() {\n\
-	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
-	fragPos = vec3(mv_Mat * objMat * vec4(in_Position, 1.0));\n\
-	vert_Normal = vec3(mv_Mat * objMat * vec4(in_Normal, 0.0));\n\
-}";
-	const char* cabina_fragShader =
-		"#version 330\n\
-in vec3 vert_Normal;\n\
-in vec3 fragPos;\n\
-out vec4 out_Color;\n\
-uniform mat4 mv_Mat;\n\
-uniform vec4 Color;\n\
-void main() {\n\
-	out_Color = Color;\n\
-}";
+	char* cabina_vertShader;
+	char* cabina_fragShader;
 
 	void setupCabina() {
 		glBufferData(GL_ARRAY_BUFFER, Cabina::vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
@@ -777,8 +565,9 @@ void main() {\n\
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-		cabinaShaders[0] = compileShader(cabina_vertShader, GL_VERTEX_SHADER, "cubeVert");
-		cabinaShaders[1] = compileShader(cabina_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
+		cabinaShaders[0] = compileShader(GL_VERTEX_SHADER, "BasicVert.txt", "cubeVert");
+		cabinaShaders[1] = compileShader(GL_FRAGMENT_SHADER, "BasicFrag.txt", "cubeFrag");
+
 
 		cabinaProgram = glCreateProgram();
 		glAttachShader(cabinaProgram, cabinaShaders[0]);
@@ -811,7 +600,14 @@ void main() {\n\
 		glUniformMatrix4fv(glGetUniformLocation(cabinaProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(cabinaMat));
 		glUniformMatrix4fv(glGetUniformLocation(cabinaProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(cabinaProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		glUniform4f(glGetUniformLocation(cabinaProgram, "Color"), cabinaColor[0], cabinaColor[1], cabinaColor[2], cabinaColor[3]);
+		glUniform3f(glGetUniformLocation(cabinaProgram, "light_Position"), ImGui::lightPosition[0] + Luz::rotationX / 100, ImGui::lightPosition[1], ImGui::lightPosition[2]);
+		glUniform3f(glGetUniformLocation(cabinaProgram, "color"), cabinaColor[0], cabinaColor[1], cabinaColor[2]);
+		glUniform3f(glGetUniformLocation(cabinaProgram, "light_Color"), ImGui::lightColor[0], ImGui::lightColor[1], ImGui::lightColor[2]);
+		glUniformMatrix4fv(glGetUniformLocation(cabinaProgram, "camera_Point"), 1, GL_FALSE, glm::value_ptr(RenderVars::_cameraPoint));
+		glUniform1f(glGetUniformLocation(cabinaProgram, "kd"), ImGui::Diffuse);
+		glUniform1f(glGetUniformLocation(cabinaProgram, "ka"), ImGui::Ambient);
+		glUniform1f(glGetUniformLocation(cabinaProgram, "ks"), ImGui::Specular);
+		glUniform1f(glGetUniformLocation(cabinaProgram, "light_Power"), ImGui::LightPower);
 		glDrawArrays(GL_TRIANGLES, 0, Cabina::vertices.size());
 
 		glUseProgram(0);
@@ -833,32 +629,10 @@ namespace Radios {
 	GLuint radiosProgram;
 
 	glm::mat4 radiosMat = glm::mat4(1.f);
-	glm::vec4 radiosColor = { 0.5f, 0.5f, 0.5f, 0.f };
+	glm::vec4 radiosColor = { 0.1f, 0.1f, 1.f, 0.f };
 
-	const char* radios_vertShader =
-		"#version 330\n\
-in vec3 in_Position;\n\
-in vec3 in_Normal;\n\
-out vec3 vert_Normal;\n\
-out vec3 fragPos;\n\
-uniform mat4 objMat;\n\
-uniform mat4 mv_Mat;\n\
-uniform mat4 mvpMat;\n\
-void main() {\n\
-	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
-	fragPos = vec3(mv_Mat * objMat * vec4(in_Position, 1.0));\n\
-	vert_Normal = vec3(mv_Mat * objMat * vec4(in_Normal, 0.0));\n\
-}";
-	const char* radios_fragShader =
-		"#version 330\n\
-in vec3 vert_Normal;\n\
-in vec3 fragPos;\n\
-out vec4 out_Color;\n\
-uniform mat4 mv_Mat;\n\
-uniform vec4 Color;\n\
-void main() {\n\
-	out_Color = Color;\n\
-}";
+	char* radios_vertShader;
+	char* radios_fragShader;
 
 	void setupRadios() {
 		glBufferData(GL_ARRAY_BUFFER, Radios::vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
@@ -881,8 +655,9 @@ void main() {\n\
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-		radiosShaders[0] = compileShader(radios_vertShader, GL_VERTEX_SHADER, "cubeVert");
-		radiosShaders[1] = compileShader(radios_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
+		radiosShaders[0] = compileShader(GL_VERTEX_SHADER, "BasicVert.txt", "cubeVert");
+		radiosShaders[1] = compileShader(GL_FRAGMENT_SHADER, "BasicFrag.txt", "cubeFrag");
+		
 
 		radiosProgram = glCreateProgram();
 		glAttachShader(radiosProgram, radiosShaders[0]);
@@ -910,7 +685,14 @@ void main() {\n\
 		glUniformMatrix4fv(glGetUniformLocation(radiosProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(radiosMat));
 		glUniformMatrix4fv(glGetUniformLocation(radiosProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(radiosProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		glUniform4f(glGetUniformLocation(radiosProgram, "Color"), radiosColor[0], radiosColor[1], radiosColor[2], radiosColor[3]);
+		glUniform3f(glGetUniformLocation(radiosProgram, "light_Position"), ImGui::lightPosition[0] + Luz::rotationX / 100, ImGui::lightPosition[1], ImGui::lightPosition[2]);
+		glUniform3f(glGetUniformLocation(radiosProgram, "color"), radiosColor[0], radiosColor[1], radiosColor[2]);
+		glUniform3f(glGetUniformLocation(radiosProgram, "light_Color"), ImGui::lightColor[0], ImGui::lightColor[1], ImGui::lightColor[2]);
+		glUniformMatrix4fv(glGetUniformLocation(radiosProgram, "camera_Point"), 1, GL_FALSE, glm::value_ptr(RenderVars::_cameraPoint));
+		glUniform1f(glGetUniformLocation(radiosProgram, "kd"), ImGui::Diffuse);
+		glUniform1f(glGetUniformLocation(radiosProgram, "ka"), ImGui::Ambient);
+		glUniform1f(glGetUniformLocation(radiosProgram, "ks"), ImGui::Specular);
+		glUniform1f(glGetUniformLocation(radiosProgram, "light_Power"), ImGui::LightPower);
 		glDrawArrays(GL_TRIANGLES, 0, Radios::vertices.size());
 
 		glUseProgram(0);
@@ -932,32 +714,10 @@ namespace Soporte {
 	GLuint soporteProgram;
 
 	glm::mat4 soporteMat = glm::mat4(1.f);
-	glm::vec4 soporteColor = { 0.5f, 0.5f, 0.5f, 0.f };
+	glm::vec4 soporteColor = { 0.1f, 0.1f, 1.0f, 0.f };
 
-	const char* soporte_vertShader =
-		"#version 330\n\
-in vec3 in_Position;\n\
-in vec3 in_Normal;\n\
-out vec3 vert_Normal;\n\
-out vec3 fragPos;\n\
-uniform mat4 objMat;\n\
-uniform mat4 mv_Mat;\n\
-uniform mat4 mvpMat;\n\
-void main() {\n\
-	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
-	fragPos = vec3(mv_Mat * objMat * vec4(in_Position, 1.0));\n\
-	vert_Normal = vec3(mv_Mat * objMat * vec4(in_Normal, 0.0));\n\
-}";
-	const char* soporte_fragShader =
-		"#version 330\n\
-in vec3 vert_Normal;\n\
-in vec3 fragPos;\n\
-out vec4 out_Color;\n\
-uniform mat4 mv_Mat;\n\
-uniform vec4 Color;\n\
-void main() {\n\
-	out_Color = Color;\n\
-}";
+	char* soporte_vertShader;
+	char* soporte_fragShader;
 
 	void setupSoporte() {
 		glBufferData(GL_ARRAY_BUFFER, Soporte::vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
@@ -980,8 +740,9 @@ void main() {\n\
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-		soporteShaders[0] = compileShader(soporte_vertShader, GL_VERTEX_SHADER, "cubeVert");
-		soporteShaders[1] = compileShader(soporte_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
+		soporteShaders[0] = compileShader(GL_VERTEX_SHADER, "BasicVert.txt", "cubeVert");
+		soporteShaders[1] = compileShader(GL_FRAGMENT_SHADER, "BasicFrag.txt", "cubeFrag");
+
 
 		soporteProgram = glCreateProgram();
 		glAttachShader(soporteProgram, soporteShaders[0]);
@@ -1008,7 +769,14 @@ void main() {\n\
 		glUniformMatrix4fv(glGetUniformLocation(soporteProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(soporteMat));
 		glUniformMatrix4fv(glGetUniformLocation(soporteProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(soporteProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		glUniform4f(glGetUniformLocation(soporteProgram, "Color"), soporteColor[0], soporteColor[1], soporteColor[2], soporteColor[3]);
+		glUniform3f(glGetUniformLocation(soporteProgram, "light_Position"), ImGui::lightPosition[0] + Luz::rotationX / 100, ImGui::lightPosition[1], ImGui::lightPosition[2]);
+		glUniform3f(glGetUniformLocation(soporteProgram, "color"), soporteColor[0], soporteColor[1], soporteColor[2]);
+		glUniform3f(glGetUniformLocation(soporteProgram, "light_Color"), ImGui::lightColor[0], ImGui::lightColor[1], ImGui::lightColor[2]);
+		glUniformMatrix4fv(glGetUniformLocation(soporteProgram, "camera_Point"), 1, GL_FALSE, glm::value_ptr(RenderVars::_cameraPoint));
+		glUniform1f(glGetUniformLocation(soporteProgram, "kd"), ImGui::Diffuse);
+		glUniform1f(glGetUniformLocation(soporteProgram, "ka"), ImGui::Ambient);
+		glUniform1f(glGetUniformLocation(soporteProgram, "ks"), ImGui::Specular);
+		glUniform1f(glGetUniformLocation(soporteProgram, "light_Power"), ImGui::LightPower);
 		glDrawArrays(GL_TRIANGLES, 0, Soporte::vertices.size());
 
 		glUseProgram(0);
@@ -1103,15 +871,14 @@ GLuint myRenderProgram;
 
 GLuint myVao; //vertex array
 
-
-
 void GLinit(int width, int height) {
 
-	bool res = loadOBJ("Gallina.obj", Gallina::vertices, Gallina::uvs, Gallina::normals);
-	bool res1 = loadOBJ("Trump.obj", Trump::vertices, Trump::uvs, Trump::normals);
-	bool res2 = loadOBJ("Cabina.obj", Cabina::vertices, Cabina::uvs, Cabina::normals);
-	bool res3 = loadOBJ("Radios.obj", Radios::vertices, Radios::uvs, Radios::normals);
-	bool res4 = loadOBJ("Soporte.obj", Soporte::vertices, Soporte::uvs, Soporte::normals);
+	bool res = loadOBJ("box.obj", Luz::vertices, Luz::uvs, Luz::normals);
+	bool res1 = loadOBJ("Gallina.obj", Gallina::vertices, Gallina::uvs, Gallina::normals);
+	bool res2 = loadOBJ("Trump.obj", Trump::vertices, Trump::uvs, Trump::normals);
+	bool res3 = loadOBJ("Cabina.obj", Cabina::vertices, Cabina::uvs, Cabina::normals);
+	bool res4 = loadOBJ("Radios.obj", Radios::vertices, Radios::uvs, Radios::normals);
+	bool res5 = loadOBJ("Soporte.obj", Soporte::vertices, Soporte::uvs, Soporte::normals);
 	glViewport(0, 0, width, height);
 
 	glClearColor(0.2f, 0.2f, 0.2f, 1.f);
@@ -1133,12 +900,19 @@ void GLinit(int width, int height) {
 	RV::_MVP = RV::_projection * RV::_modelView;
 	RV::start = std::clock();
 	RV::firstTime = true;
+	RV::secondTime = false;
+	RV::init = true;
+	ImGui::exercise1 = 1;
+	ImGui::exercise2 = 0;
+
+	//carregar shaders
+
 
 	// Setup shaders & geometry
 
 	Axis::setupAxis();
 
-	Cube::setupCube();
+	Luz::setupLuz();
 
 	Gallina::setupGallina();
 
@@ -1149,6 +923,8 @@ void GLinit(int width, int height) {
 	Radios::setupRadios();
 
 	Soporte::setupSoporte();
+
+	RV::init = false;
 
 	/////////////////////////////////////////////////////TODO
 
@@ -1174,7 +950,7 @@ void GLcleanup() {
 
 	Axis::cleanupAxis();
 
-	Cube::cleanupCube();
+	Luz::cleanupLuz();
 
 	Gallina::cleanupGallina();
 
@@ -1204,21 +980,64 @@ float currentTime = 0;
 
 void GLrender(float dt) {
 
+	double a = CLOCKS_PER_SEC; 
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	if (((std::clock() - RV::start) / (double) CLOCKS_PER_SEC) > 1 && !RV::lookingTrump)
+	if (ImGui::exercise1 & 1)
 	{
-		if (RV::firstTime) RV::firstTime = false;
-		printf("LOOKING AT TRUMP");
-		RV::lookingTrump = true;
+		Gallina::cleanupGallina();
+
+		Trump::cleanupTrump();
+
+		Gallina::setupGallina();
+
+		Trump::setupTrump();
+
+		ImGui::exercise1--;
+		ImGui::exercise2 = 0;
+	}
+	else if(ImGui::exercise2 & 1)
+	{
+		Gallina::cleanupGallina();
+
+		Trump::cleanupTrump();
+
+		Gallina::setupGallina();
+
+		Trump::setupTrump();
+
+		ImGui::exercise2--;
+		ImGui::exercise1 = 0;
+	}
+
+	if (RV::firstTime && ((std::clock() - RV::start) / a) > 1)
+	{
+		RV::firstTime = false;
+		RV::secondTime = true;
 		RV::start = std::clock();
 	}
-	else if (((std::clock() - RV::start) / (double)CLOCKS_PER_SEC) > 1)
+	else if (RV::secondTime && ((std::clock() - RV::start) / a) > 1)
 	{
-		printf("LOOKING AT CHICKEN");
-		RV::lookingTrump = false;
+		RV::secondTime = false;
 		RV::start = std::clock();
-	}	
+	}
+	else
+	{
+		if (((std::clock() - RV::start) / (double)CLOCKS_PER_SEC) > 1 && !RV::lookingTrump)
+		{
+			RV::lookingTrump = true;
+			RV::start = std::clock();
+		}
+		else if (((std::clock() - RV::start) / (double)CLOCKS_PER_SEC) > 1)
+		{
+			RV::lookingTrump = false;
+			RV::start = std::clock();
+		}
+	}
+
+	Cabina::mainX = Cabina::lastX;
+	Cabina::mainY = Cabina::lastY;
 
 	Axis::drawAxis();
 
@@ -1239,8 +1058,24 @@ void GLrender(float dt) {
 
 	/////////////////////////////////////////////////////////
 
-	Cabina::mainX = Cabina::lastX;
-	Cabina::mainY = Cabina::lastY;
+	Luz::luzMat = glm::translate(Luz::luzMat, glm::vec3(((cos(glm::radians(Luz::angle)) * 5.55)) - Luz::position.x, ((sin(glm::radians(Luz::angle)) * 5.55) + 6.2) - Luz::position.y, 0.0f));
+	Luz::position.x = (cos(glm::radians(Luz::angle)) * 5.55);
+	Luz::position.y = (sin(glm::radians(Luz::angle)) * 5.55) + 6.2;
+
+	if (Luz::goingRight)
+	{
+		Luz::luzMat = glm::translate(Luz::luzMat, glm::vec3(0.01f, 0.0f, 0.0f));
+		Luz::rotationX++;
+		if (Luz::rotationX > 20) Luz::goingRight = false;
+	}
+	else
+	{
+		Luz::luzMat = glm::translate(Luz::luzMat, glm::vec3(-0.01f, 0.0f, 0.0f));
+		Luz::rotationX--;
+		if (Luz::rotationX < -20) Luz::goingRight = true;
+	}
+
+	Luz::drawLuz(currentTime);
 
 	Gallina::gallinaMat = glm::translate(Gallina::gallinaMat, glm::vec3(0.0f, ((sin(glm::radians(Gallina::angle)) * 5.55) + 5.8) - Gallina::lastY, ((cos(glm::radians(Gallina::angle)) * 5.55) - 0.15) - Gallina::lastX));
 	Gallina::lastX = (cos(glm::radians(Gallina::angle)) * 5.55) - 0.15;
@@ -1262,10 +1097,9 @@ void GLrender(float dt) {
 		if (Cabina::angle >= 360) Cabina::angle -= 360;
 	}
 
-	//Cabina::drawCabina(currentTime);
-
 	Radios::radiosMat = glm::rotate(Radios::radiosMat, (float)glm::radians(ImGui::Velocity), glm::vec3(0, 0, 1));
 	Radios::drawRadios(currentTime);
+	Luz::angle += ImGui::Velocity;
 	Gallina::angle += ImGui::Velocity;
 	Trump::angle += ImGui::Velocity;
 	Cabina::angle += ImGui::Velocity;
@@ -1284,7 +1118,7 @@ void GLrender(float dt) {
 
 	//EX2:
 	//glDrawArrays(GL_TRIANGLES, 0, 3);
-	if (!RV::firstTime)
+	if (!RV::firstTime && !RV::secondTime)
 	{
 		if (!RV::lookingTrump)
 		{
@@ -1320,14 +1154,18 @@ void GUI() {
 		// ...
 		// ...
 		/////////////////////////////////////////////////////////
-		ImGui::DragFloat("Velocity", &ImGui::Velocity, 0.01f, 0.1f, 0.5f);
 		ImGui::DragFloat("Diffuse", &ImGui::Diffuse, 0.02f, 0.0f, 1.0f);
 		ImGui::DragFloat("Specular", &ImGui::Specular, 0.02f, 0.0f, 1.0f);
 		ImGui::DragFloat("Ambient", &ImGui::Ambient, 0.02f, 0.0, 1.0f);
 		ImGui::DragFloat("Light Power", &ImGui::LightPower, 0.02f, 0.0f, 1.0f);
-		ImGui::DragFloat("Light X", &ImGui::lightPosition[0], 0.02f, -10.0f, 10.0f);
-		ImGui::DragFloat("Light Y", &ImGui::lightPosition[1], 0.02f, -10.0f, 10.0f);
-		ImGui::DragFloat("Light Z", &ImGui::lightPosition[2], 0.02f, -10.0f, 10.0f);
+		if (ImGui::Button("Exercise 1"))
+		{
+			ImGui::exercise1++;
+		}
+		if (ImGui::Button("Exercise 2"))
+		{
+			ImGui::exercise2++;
+		}
 	}
 	// .........................
 

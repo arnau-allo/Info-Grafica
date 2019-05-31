@@ -33,7 +33,6 @@ bool loadOBJ(
 		int res = fscanf(file, "%s", lineHeader);
 		if (res == EOF)
 		{
-			printf("File ended\n");
 			break; // EOF = End Of File. Quit the loop.
 		}
 

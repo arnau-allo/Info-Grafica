@@ -1,0 +1,41 @@
+#version 330
+in vec3 vert_Normal;
+in vec3 fragPos;
+in vec3 vec_light;
+in vec3 vec_light2;
+vec3 e;
+vec3 ambient_light;
+vec3 diffuse_color;
+vec3 specular_light;
+vec3 specular_light2;
+out vec4 out_Color;
+uniform mat4 mv_Mat;
+uniform vec3 color;
+uniform vec3 light_Color;
+uniform vec3 light_Color2;
+uniform float kd;
+uniform float ka;
+uniform float ks;
+uniform float light_Power;
+float cosTheta;
+float cosAlpha;
+float cosAlpha2;
+vec3 r;
+vec3 r2;
+void main() {
+	ambient_light = ka * color.xyz * light_Color;
+	cosTheta = max(dot(normalize(vert_Normal), normalize(vec_light)), 0.0);
+	if(cosTheta < 0.2) cosTheta = 0;
+	else if(cosTheta < 0.4) cosTheta = 0.2;
+	else if(cosTheta < 0.5) cosTheta = 0.4;
+	else if(cosTheta > 0.5) cosTheta = 1;
+	diffuse_color =  kd * color.xyz * light_Color * cosTheta;
+	r = reflect(-vec_light, vert_Normal);
+	e = normalize(-fragPos);
+	cosAlpha = pow(max(dot(e, r), 0.0), light_Power);
+	specular_light = ks * color.xyz * light_Color * cosAlpha;
+	r2 = reflect(-vec_light2, vert_Normal);
+	cosAlpha2 = pow(max(dot(e, r2), 0.0), light_Power);
+	specular_light2 = ks * color.xyz * light_Color2 * cosAlpha2;
+	out_Color = vec4(ambient_light + diffuse_color + specular_light + specular_light2, 0);
+}
