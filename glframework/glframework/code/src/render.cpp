@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
+#include <ctime>
+#include <time.h>
 
 #include <GL\glew.h>
 #include <glm\gtc\type_ptr.hpp>
@@ -19,7 +21,8 @@
 namespace ImGui {
 	glm::vec3 lightPosition = { 10.f, 10.0f, 10.0f };
 	glm::vec3 lightColor = { 1.f, 1.f, 1.f };
-	float Velocity, PosX, PosY, PosZ, Diffuse, Specular, Ambient, LightPower;
+	float Velocity = 0.1;
+	float Diffuse, Specular, Ambient, LightPower;
     void Render();
 }
 namespace Axis {
@@ -34,6 +37,10 @@ namespace RenderVars {
 	const float FOV = glm::radians(65.f);
 	const float zNear = 0.01f;
 	const float zFar = 50.f;
+
+	bool lookingTrump = false;
+	bool firstTime;
+	double start;
 
 	glm::mat4 _projection;
 	glm::mat4 _modelView;
@@ -673,8 +680,8 @@ void main() {\n\
 		glBindAttribLocation(trumpProgram, 0, "in_Position");
 		glBindAttribLocation(trumpProgram, 1, "in_Normal");
 		linkProgram(trumpProgram);
-		trumpMat = glm::rotate(trumpMat, (float)glm::radians(-90.0f), glm::vec3(0, 1, 0));
-		trumpMat = glm::translate(trumpMat, glm::vec3(0.2f, 5.8f, -5.7f));	
+		trumpMat = glm::rotate(trumpMat, (float)glm::radians(180.0f), glm::vec3(0, 1, 0));
+		trumpMat = glm::translate(trumpMat, glm::vec3(-5.7f, 5.8f, -0.2f));
 		lastX = -5.7f;
 		lastY = 5.8;
 	}
@@ -1124,7 +1131,8 @@ void GLinit(int width, int height) {
 	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
 	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));
 	RV::_MVP = RV::_projection * RV::_modelView;
-
+	RV::start = std::clock();
+	RV::firstTime = true;
 
 	// Setup shaders & geometry
 
@@ -1198,11 +1206,19 @@ void GLrender(float dt) {
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	RV::_modelView = glm::mat4(1.f);
-	RV::_modelView = glm::translate(RV::_modelView, glm::vec3(RV::panv[0], RV::panv[1], RV::panv[2]));
-	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
-	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));
-	RV::_MVP = RV::_projection * RV::_modelView;
+	if (((std::clock() - RV::start) / (double) CLOCKS_PER_SEC) > 1 && !RV::lookingTrump)
+	{
+		if (RV::firstTime) RV::firstTime = false;
+		printf("LOOKING AT TRUMP");
+		RV::lookingTrump = true;
+		RV::start = std::clock();
+	}
+	else if (((std::clock() - RV::start) / (double)CLOCKS_PER_SEC) > 1)
+	{
+		printf("LOOKING AT CHICKEN");
+		RV::lookingTrump = false;
+		RV::start = std::clock();
+	}	
 
 	Axis::drawAxis();
 
@@ -1231,7 +1247,7 @@ void GLrender(float dt) {
 	Gallina::lastY = (sin(glm::radians(Gallina::angle)) * 5.55) + 5.8;
 	Gallina::drawGallina(currentTime);
 
-	Trump::trumpMat = glm::translate(Trump::trumpMat, glm::vec3(0.0f, ((sin(glm::radians(Trump::angle)) * 5.55) + 5.8) - Trump::lastY, -((cos(glm::radians(Trump::angle)) * 5.55) + 0.15) - Trump::lastX));
+	Trump::trumpMat = glm::translate(Trump::trumpMat, glm::vec3(-((cos(glm::radians(Trump::angle)) * 5.55) + 0.15) - Trump::lastX, ((sin(glm::radians(Trump::angle)) * 5.55) + 5.8) - Trump::lastY, 0.0f));
 	Trump::lastX = -((cos(glm::radians(Trump::angle)) * 5.55) + 0.15);
 	Trump::lastY = (sin(glm::radians(Trump::angle)) * 5.55) + 5.8;
 	Trump::drawTrump(currentTime);
@@ -1268,8 +1284,24 @@ void GLrender(float dt) {
 
 	//EX2:
 	//glDrawArrays(GL_TRIANGLES, 0, 3);
-
-
+	if (!RV::firstTime)
+	{
+		if (!RV::lookingTrump)
+		{
+			RV::panv[0] = -Trump::lastX + 0.08f;
+			RV::panv[1] = Trump::lastY + 0.4f;
+			RV::panv[2] = 0.4;
+			RV::_modelView = glm::lookAt(glm::vec3(RV::panv[0], RV::panv[1], RV::panv[2]), glm::vec3(Gallina::lastX, Gallina::lastY + 0.2f, 0.2f), glm::vec3(0, 1, 0));
+		}
+		else
+		{
+			RV::panv[0] = Gallina::lastX - 0.26f;
+			RV::panv[1] = Gallina::lastY + 0.4f;
+			RV::panv[2] = 0.4;
+			RV::_modelView = glm::lookAt(glm::vec3(RV::panv[0], RV::panv[1], RV::panv[2]), glm::vec3(-Trump::lastX, Trump::lastY + 0.2f, 0.2f), glm::vec3(0, 1, 0));
+		}
+		RV::_MVP = RV::_projection * RV::_modelView;
+	}
 
 	ImGui::Render();
 
@@ -1288,10 +1320,7 @@ void GUI() {
 		// ...
 		// ...
 		/////////////////////////////////////////////////////////
-		ImGui::DragFloat("Velocity", &ImGui::Velocity, 0.01f, 0.0f, 0.5f);
-		ImGui::DragFloat("POS_X", &ImGui::PosX, 0.02f, -20.0f, -20.0f);
-		ImGui::DragFloat("POS_Y", &ImGui::PosY, 0.02f, -20.0f, -20.0f);
-		ImGui::DragFloat("POS_Z", &ImGui::PosZ, 0.02f, -20.0f, -20.0f);
+		ImGui::DragFloat("Velocity", &ImGui::Velocity, 0.01f, 0.1f, 0.5f);
 		ImGui::DragFloat("Diffuse", &ImGui::Diffuse, 0.02f, 0.0f, 1.0f);
 		ImGui::DragFloat("Specular", &ImGui::Specular, 0.02f, 0.0f, 1.0f);
 		ImGui::DragFloat("Ambient", &ImGui::Ambient, 0.02f, 0.0, 1.0f);
